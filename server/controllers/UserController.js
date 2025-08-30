@@ -8,7 +8,7 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // Signup
 export const signup = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { firstname, lastname ,email, password } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser)
@@ -17,7 +17,8 @@ export const signup = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
-      name,
+      firstname,
+      lastname,
       email,
       password: hashedPassword,
       isGoogleUser: false
@@ -29,7 +30,7 @@ export const signup = async (req, res) => {
   }
 };
 
-// Login
+
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -76,10 +77,13 @@ export const googleLogin = async (req, res) => {
 
     if (!user) {
       user = await User.create({
-        name,
+        firstname: name.split(" ")[0],
+        lastname: name.split(" ").slice(1).join(" "),
         email,
         password: sub, 
-        isGoogleUser: true
+        isGoogleUser: true,
+        authProvider: 'google',
+        googleId: sub
       });
     }
 
@@ -89,7 +93,7 @@ export const googleLogin = async (req, res) => {
 
     res.json({
       token: appToken,
-      user: { id: user._id, name: user.name, email: user.email }
+      user: { id: user._id, email: user.email, firstname: user.firstname, lastname: user.lastname }
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
