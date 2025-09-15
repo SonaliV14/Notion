@@ -1,161 +1,139 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { 
-  BookOpen, 
-  Users, 
-  Zap, 
-  Shield, 
-  ArrowRight, 
-  CheckCircle,
-  Star,
-  Globe,
-  Smartphone,
-  Lock
+import React, { useState } from 'react';
+import {
+  BookOpen, Users, Zap, Shield, ArrowRight, Star, Globe, Smartphone,
+  Menu, X
 } from 'lucide-react';
 
 const LandingPage = () => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const features = [
-    {
-      icon: <BookOpen className="w-8 h-8 text-blue-600" />,
-      title: "Rich Text Editor",
-      description: "Create beautiful documents with our powerful block-based editor"
-    },
-    {
-      icon: <Users className="w-8 h-8 text-blue-600" />,
-      title: "Team Collaboration",
-      description: "Work together in real-time with your team members"
-    },
-    {
-      icon: <Zap className="w-8 h-8 text-blue-600" />,
-      title: "Lightning Fast",
-      description: "Experience blazing fast performance with instant sync"
-    },
-    {
-      icon: <Shield className="w-8 h-8 text-blue-600" />,
-      title: "Secure & Private",
-      description: "Your data is encrypted and protected with enterprise-grade security"
-    },
-    {
-      icon: <Globe className="w-8 h-8 text-blue-600" />,
-      title: "Access Anywhere",
-      description: "Work from any device, anywhere in the world"
-    },
-    {
-      icon: <Smartphone className="w-8 h-8 text-blue-600" />,
-      title: "Mobile Ready",
-      description: "Fully responsive design that works perfectly on mobile"
-    }
+    { icon: <BookOpen />, title: "Rich Text Editor", description: "Create beautiful documents with our powerful block-based editor that adapts to your writing style." },
+    { icon: <Users />, title: "Team Collaboration", description: "Work together in real-time with your team members across different time zones and devices." },
+    { icon: <Zap />, title: "Lightning Fast", description: "Experience blazing fast performance with instant sync and zero-latency interactions." },
+    { icon: <Shield />, title: "Secure & Private", description: "Your data is encrypted and protected with enterprise-grade security protocols." },
+    { icon: <Globe />, title: "Access Anywhere", description: "Work from any device, anywhere in the world with seamless cloud synchronization." },
+    { icon: <Smartphone />, title: "Mobile Ready", description: "Fully responsive design that works perfectly on mobile devices and tablets." }
   ];
 
   const testimonials = [
-    {
-      name: "Sarah Johnson",
-      role: "Product Manager",
-      content: "NoteHub has revolutionized how our team collaborates. It's intuitive and powerful.",
-      rating: 5
-    },
-    {
-      name: "Michael Chen",
-      role: "Software Engineer",
-      content: "The best note-taking app I've ever used. Clean interface and great features.",
-      rating: 5
-    },
-    {
-      name: "Emily Davis",
-      role: "Designer",
-      content: "Perfect for organizing my design thoughts and collaborating with developers.",
-      rating: 5
-    }
+    { name: "Sarah Johnson", role: "Product Manager at TechCorp", content: "NoteHub has revolutionized how our team collaborates. The interface is intuitive, and the features are exactly what we needed.", rating: 5, avatar: "SJ" },
+    { name: "Michael Chen", role: "Software Engineer at StartupXYZ", content: "The best note-taking app I've ever used. Clean interface, powerful features, and incredible performance.", rating: 5, avatar: "MC" },
+    { name: "Emily Davis", role: "UX Designer at Creative Co", content: "Perfect for organizing my design thoughts and collaborating with developers. It's become essential to my workflow.", rating: 5, avatar: "ED" }
+  ];
+
+  const stats = [
+    { value: "10K+", label: "Active Users" },
+    { value: "50M+", label: "Notes Created" },
+    { value: "99.9%", label: "Uptime" },
+    { value: "24/7", label: "Support" }
   ];
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <div className="min-h-screen font-sans bg-neutral-950 text-white relative overflow-x-hidden">
+
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 border border-neutral-800/30 rounded-full animate-pulse shadow-2xl shadow-neutral-800/20"></div>
+        <div className="absolute top-3/4 right-1/4 w-64 h-64 border border-neutral-700/40 rounded-full animate-pulse shadow-xl shadow-neutral-700/15" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-neutral-900/20 rounded-full animate-spin" style={{ animationDuration: '60s' }}></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-neutral-900/10 via-transparent to-neutral-900/5"></div>
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-neutral-800/5 to-transparent"></div>
+      </div>
+
+      {/* Black Header */}
+      <header className="fixed top-0 w-full bg-black border-b border-neutral-800 z-50 shadow-2xl shadow-black/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <BookOpen className="w-8 h-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">NoteHub</span>
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-11 h-11 rounded-3xl flex items-center justify-center bg-white shadow-2xl shadow-black/20 border border-neutral-800">
+                <BookOpen className="w-6 h-6 text-black" />
+              </div>
+              <span className="text-2xl font-black tracking-tight text-white">NoteHub</span>
             </div>
-            <div className="flex items-center space-x-4">
-              <Link
-                to="/login"
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                Sign In
-              </Link>
-              <Link
-                to="/signup"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Get Started
-              </Link>
-            </div>
+
+            <nav className="hidden md:flex items-center space-x-8">
+              <a href="#features" className="text-neutral-400 hover:text-white font-medium transition-all duration-300">Features</a>
+              <a href="#testimonials" className="text-neutral-400 hover:text-white font-medium transition-all duration-300">Reviews</a>
+              <a href="#pricing" className="text-neutral-400 hover:text-white font-medium transition-all duration-300">Pricing</a>
+              <a href="/login" className="text-neutral-400 hover:text-white font-medium transition-all duration-300">Sign In</a>
+              <a href="/signup" className="px-6 py-3 rounded-2xl font-bold bg-white text-black hover:bg-neutral-100 transition-all">Get Started</a>
+            </nav>
+
+            <button className="md:hidden p-2 rounded-2xl hover:bg-neutral-800 transition-all duration-300" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+              {mobileMenuOpen ? <X className="w-6 h-6 text-white" /> : <Menu className="w-6 h-6 text-white" />}
+            </button>
           </div>
         </div>
-      </nav>
+      </header>
+
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-40 pt-20 bg-black backdrop-blur-2xl">
+          <div className="px-6 py-8 space-y-8">
+            <a href="#features" className="block text-2xl font-medium text-white border-b border-neutral-700">Features</a>
+            <a href="#testimonials" className="block text-2xl font-medium text-white border-b border-neutral-700">Reviews</a>
+            <a href="#pricing" className="block text-2xl font-medium text-white border-b border-neutral-700">Pricing</a>
+            <a href="/login" className="block text-2xl font-medium text-white border-b border-neutral-700">Sign In</a>
+            <a href="/signup" className="block w-full py-4 rounded-2xl text-xl font-bold text-center bg-white text-black transition-all">Get Started</a>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-50 via-white to-purple-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-              Your ideas deserve a
-              <span className="text-blue-600 block">better workspace</span>
-            </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
-              NoteHub is the connected workspace where better, faster work happens. 
-              Write, plan, collaborate, and get organized — all in one place.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link
-                to="/signup"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg text-lg font-semibold transition-all duration-200 transform hover:scale-105 flex items-center space-x-2"
-              >
-                <span>Get NoteHub free</span>
-                <ArrowRight className="w-5 h-5" />
-              </Link>
-              <Link
-                to="/login"
-                className="border-2 border-gray-300 hover:border-gray-400 text-gray-700 px-8 py-4 rounded-lg text-lg font-semibold transition-colors"
-              >
-                Sign In
-              </Link>
-            </div>
-            <p className="text-sm text-gray-500 mt-4">
-              Free for personal use. No credit card required.
-            </p>
+      <section className="pt-32 pb-20 relative text-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <h1 className="text-6xl md:text-8xl font-black mb-8 leading-[0.9] tracking-tighter">
+            Your ideas deserve a
+            <span className="block bg-gradient-to-r from-white via-neutral-200 to-neutral-300 bg-clip-text text-transparent drop-shadow-2xl">better workspace</span>
+          </h1>
+          <p className="text-2xl mb-12 max-w-4xl mx-auto leading-relaxed text-neutral-400 font-light">
+            NoteHub is the connected workspace where better, faster work happens. Write, plan, collaborate, and get organized — all in one powerful platform.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-12">
+            <a href="/signup" className="group px-12 py-6 rounded-3xl text-xl font-bold bg-white text-neutral-900 hover:bg-neutral-100 transform hover:scale-105 flex items-center space-x-3 transition-all duration-300  shadow-white/20 border border-neutral-200/20 hover:shadow-white/30">
+              <span>Get NoteHub free</span>
+              <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform duration-300" />
+            </a>
+            <button className="px-12 py-6 rounded-3xl text-xl font-bold border-2 border-neutral-700/50 bg-neutral-800/20 backdrop-blur-xl text-white hover:border-neutral-600/70 hover:bg-neutral-700/30 transition-all duration-300 transform hover:scale-105 shadow-2xl shadow-neutral-900/30">
+              Watch Demo
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="py-20 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            {stats.map((stat, index) => (
+              <div key={index} className="text-center group p-6 rounded-3xl border bg-gradient-to-br from-neutral-800/20 to-neutral-900/30 shadow-2xl hover:scale-105">
+                <div className="text-4xl font-black mb-2 bg-gradient-to-r from-white to-neutral-300 bg-clip-text text-transparent">{stat.value}</div>
+                <div className="text-neutral-400">{stat.label}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Everything you need to stay organized
+      <section id="features" className="py-24 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="text-center mb-20">
+            <h2 className="text-5xl font-black mb-6">
+              Everything you need
+              <span className="block bg-gradient-to-r from-white via-neutral-200 to-neutral-300 bg-clip-text text-transparent drop-shadow-xl">to stay organized</span>
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Powerful features that help you create, collaborate, and organize your work like never before.
+            <p className="text-xl text-neutral-400 font-light">
+              Manage your tasks, notes, and collaboration efficiently with NoteHub.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <div
-                key={index}
-                className="bg-white p-8 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 group"
-              >
-                <div className="mb-4 group-hover:scale-110 transition-transform duration-200">
-                  {feature.icon}
+              <div key={index} className="group p-8 rounded-3xl border bg-gradient-to-br from-neutral-800/20 to-neutral-900/30 shadow-2xl hover:-translate-y-3 hover:border-neutral-600/50 transition-all">
+                <div className="mb-6 p-4 bg-gradient-to-br from-neutral-700/30 to-neutral-800/40 rounded-3xl w-fit border group-hover:bg-white group-hover:shadow-2xl">
+                  {React.cloneElement(feature.icon, { className: "w-10 h-10 text-white group-hover:text-black" })}
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600 leading-relaxed">
-                  {feature.description}
-                </p>
+                <h3 className="text-2xl font-bold text-white">{feature.title}</h3>
+                <p className="text-neutral-400">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -163,33 +141,34 @@ const LandingPage = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Loved by teams worldwide
+      <section id="testimonials" className="py-24 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="text-center mb-20">
+            <h2 className="text-5xl font-black mb-6">
+              Loved by teams
+              <span className="block bg-gradient-to-r from-white via-neutral-200 to-neutral-300 bg-clip-text text-transparent drop-shadow-xl">worldwide</span>
             </h2>
-            <p className="text-xl text-gray-600">
-              See what our users have to say about NoteHub
+            <p className="text-xl font-light text-neutral-400">
+              See what our users have to say about their NoteHub experience
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {testimonials.map((testimonial, index) => (
-              <div
-                key={index}
-                className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200"
-              >
-                <div className="flex items-center mb-4">
+              <div key={index} className="group p-8 rounded-3xl border bg-gradient-to-br from-neutral-800/20 to-neutral-900/30 shadow-2xl hover:-translate-y-2 hover:border-neutral-600/50 transition-all">
+                <div className="flex items-center mb-6 space-x-1">
                   {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                    <Star key={i} className="w-6 h-6 text-yellow-400 fill-current" />
                   ))}
                 </div>
-                <p className="text-gray-700 mb-6 leading-relaxed">
-                  "{testimonial.content}"
-                </p>
-                <div>
-                  <p className="font-semibold text-gray-900">{testimonial.name}</p>
-                  <p className="text-gray-600 text-sm">{testimonial.role}</p>
+                <p className="mb-8 text-neutral-300">{testimonial.content}</p>
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-white to-neutral-200 text-neutral-900 shadow-2xl border">
+                    {testimonial.avatar}
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">{testimonial.name}</p>
+                    <p className="text-neutral-400 text-sm">{testimonial.role}</p>
+                  </div>
                 </div>
               </div>
             ))}
@@ -198,43 +177,83 @@ const LandingPage = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-blue-600">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-white mb-6">
-            Ready to get started?
+      <section className="py-24 text-center relative">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <h2 className="text-5xl font-black mb-8 leading-tight">
+            Ready to get
+            <span className="block bg-gradient-to-r from-white via-neutral-200 to-neutral-300 bg-clip-text text-transparent drop-shadow-2xl">started</span>
           </h2>
-          <p className="text-xl text-blue-100 mb-8">
-            Join thousands of teams already using NoteHub to organize their work and ideas.
+          <p className="text-2xl mb-12 text-neutral-400">
+            Join thousands of teams already using NoteHub to organize their work, streamline collaboration, and bring their best ideas to life.
           </p>
-          <Link
-            to="/signup"
-            className="bg-white hover:bg-gray-100 text-blue-600 px-8 py-4 rounded-lg text-lg font-semibold transition-colors inline-flex items-center space-x-2"
-          >
-            <span>Start for free</span>
-            <ArrowRight className="w-5 h-5" />
-          </Link>
+
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+            <a
+              href="/signup"
+              className="px-12 py-6 rounded-2xl text-xl font-bold bg-white text-black flex items-center space-x-3 transition-all duration-300 shadow-2xl shadow-black/20 border border-neutral-700 hover:scale-105"
+            >
+              <span>Start for free</span>
+              <ArrowRight className="w-6 h-6" />
+            </a>
+            <button className="px-12 py-6 rounded-2xl text-xl font-bold text-white border-2 border-neutral-700 bg-transparent transition-all duration-300 hover:bg-neutral-800 hover:scale-105 shadow-2xl shadow-black/20">
+              Contact Sales
+            </button>
+          </div>
+
+          <p className="mt-8 text-neutral-500 text-sm">
+            Free forever for personal use • Upgrade anytime
+          </p>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-2 mb-4 md:mb-0">
-              <BookOpen className="w-8 h-8 text-blue-400" />
-              <span className="text-2xl font-bold">NoteHub</span>
+      <footer className="py-16 bg-neutral-900 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div>
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-9 h-9 rounded-2xl flex items-center justify-center bg-white text-black shadow-2xl border">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+                <span className="text-2xl font-bold text-white">NoteHub</span>
+              </div>
+              <p className="text-neutral-500">The connected workspace for modern teams.</p>
             </div>
-            <div className="flex items-center space-x-6 text-gray-400">
-              <a href="#" className="hover:text-white transition-colors">Privacy</a>
-              <a href="#" className="hover:text-white transition-colors">Terms</a>
-              <a href="#" className="hover:text-white transition-colors">Support</a>
+
+            <div>
+              <h3 className="font-bold text-white mb-4">Product</h3>
+              <ul className="space-y-3">
+                <li><a href="#" className="text-neutral-400 hover:text-white">Features</a></li>
+                <li><a href="#" className="text-neutral-400 hover:text-white">Pricing</a></li>
+                <li><a href="#" className="text-neutral-400 hover:text-white">Updates</a></li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-bold text-white mb-4">Company</h3>
+              <ul className="space-y-3">
+                <li><a href="#" className="text-neutral-400 hover:text-white">About</a></li>
+                <li><a href="#" className="text-neutral-400 hover:text-white">Careers</a></li>
+                <li><a href="#" className="text-neutral-400 hover:text-white">Contact</a></li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-bold text-white mb-4">Support</h3>
+              <ul className="space-y-3">
+                <li><a href="#" className="text-neutral-400 hover:text-white">Help Center</a></li>
+                <li><a href="#" className="text-neutral-400 hover:text-white">Privacy Policy</a></li>
+                <li><a href="#" className="text-neutral-400 hover:text-white">Terms of Service</a></li>
+              </ul>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 NoteHub. All rights reserved.</p>
+
+          <div className="mt-12 text-center text-neutral-500 text-sm">
+            &copy; {new Date().getFullYear()} NoteHub. All rights reserved.
           </div>
         </div>
       </footer>
+
     </div>
   );
 };
