@@ -1,101 +1,32 @@
-// Simplified API service for demo purposes
-const API_BASE_URL = 'http://localhost:5000';
-
-// Mock API functions for development/demo
-export const login = async (email, password) => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  if (email === 'demo@notehub.com' && password === 'password') {
-    return {
-      token: 'mock-jwt-token',
-      user: {
-        id: 1,
-        firstname: 'John',
-        lastname: 'Doe',
-        email: email
-      }
-    };
-  } else {
-    throw new Error('Invalid credentials');
-  }
-};
-
-export const signup = async (firstname, lastname, email, password) => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  return {
-    message: 'User created successfully'
-  };
-};
-
-export const googleLogin = async (token) => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  return {
-    token: 'mock-google-jwt-token',
-    user: {
-      id: 2,
-      firstname: 'Google',
-      lastname: 'User',
-      email: 'google.user@gmail.com'
-    }
-  };
-};
-
-export const getProfile = async () => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  return {
-    id: 1,
-    firstname: 'John',
-    lastname: 'Doe',
-    email: 'demo@notehub.com'
-  };
-};
-
-// For production use, uncomment and modify these:
-/*
-import axios from 'axios';
+import axios from "axios";
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: "http://localhost:5000/api",
 });
 
-// Add token to requests if available
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+export const signup = async (formData) => {
+  try {
+    const { data } = await api.post("/auth/signup", formData);
+    return data; // { success, token, user, error? }
+  } catch (err) {
+    return { success: false, error: err.response?.data?.error || "Signup failed" };
   }
-  return config;
-});
-
-export const login = async (email, password) => {
-  const response = await api.post('/login', { email, password });
-  return response.data;
 };
 
-export const signup = async (firstname, lastname, email, password) => {
-  const response = await api.post('/signup', { firstname, lastname, email, password });
-  return response.data;
+export const login = async (formData) => {
+  try {
+    const { data } = await api.post("/auth/login", formData);
+    return data; // { success, token, user, error? }
+  } catch (err) {
+    return { success: false, error: err.response?.data?.error || "Login failed" };
+  }
 };
 
-export const googleLogin = async (token) => {
-  const response = await api.post('/google', { token });
-  return response.data;
+export const googleLogin = async (credential) => {
+  try {
+    const { data } = await api.post("/auth/google", { credential });
+    return data; // { success, token, user, error? }
+  } catch (err) {
+    return { success: false, error: err.response?.data?.error || "Google login failed" };
+  }
 };
-
-export const getProfile = async () => {
-  const response = await api.get('/profile');
-  return response.data;
-};
-*/
-
-export default { login, signup, googleLogin, getProfile };

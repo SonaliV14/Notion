@@ -4,33 +4,35 @@ import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
-import Dashboard from './components/Dashboard.jsx';
+import ContactUs from './pages/ContactUs.jsx';
+import Dashboard from './pages/Dashboard.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 function AppRoutes() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    // Optionally show a loader while checking auth status
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <Routes>
-      <Route 
-        path="/" 
-        element={user ? <Navigate to="/dashboard" /> : <LandingPage />} 
-      />
-      <Route 
-        path="/login" 
-        element={user ? <Navigate to="/dashboard" /> : <Login />} 
-      />
-      <Route 
-        path="/signup" 
-        element={user ? <Navigate to="/dashboard" /> : <Signup />} 
-      />
-      <Route 
-        path="/dashboard" 
+      <Route path="/" element={user ? <Navigate to="/dashboard" /> : <LandingPage />} />
+      <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
+      <Route path="/signup" element={user ? <Navigate to="/dashboard" /> : <Signup />} />
+      <Route path="/contact-us" element={<ContactUs />} />
+      <Route
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <Dashboard />
           </ProtectedRoute>
-        } 
+        }
       />
     </Routes>
   );
@@ -49,3 +51,4 @@ function App() {
 }
 
 export default App;
+

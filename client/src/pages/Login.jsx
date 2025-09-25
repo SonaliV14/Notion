@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BookOpen, Eye, EyeOff, Mail, Lock, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login, googleLogin } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -17,17 +19,47 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
-
-    setTimeout(() => {
-      if (formData.email === 'demo@example.com' && formData.password === 'password') {
-        alert('Login successful! (This is a demo)');
+    try {
+      const res = await login(formData.email, formData.password);
+      if (res.success) {
+        navigate('/dashboard');
       } else {
-        setError('Invalid email or password. Try demo@example.com with password: password');
+        setError(res.error);
       }
-      setLoading(false);
-    }, 1500);
+    } catch (err) {
+      setError('Login failed. Please try again.');
+    }
+    setLoading(false);
   };
+
+  const handleGoogleResponse = async (response) => {
+    try {
+      const res = await googleLogin(response.credential);
+      if (res.success) {
+        navigate('/dashboard');
+      } else {
+        setError(res.error);
+      }
+    } catch (err) {
+      setError('Google login failed. Please try again.');
+    }
+  };
+
+  useEffect(() => {
+    /* global google */
+    if (window.google) {
+      google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        callback: handleGoogleResponse,
+      });
+      google.accounts.id.renderButton(
+        document.getElementById('googleSignInDiv'),
+        { theme: 'outline', size: 'large', width: 240 }
+      );
+    } else {
+      console.error('Google Identity Services not loaded. Make sure script is included in index.html');
+    }
+  }, []);
 
   return (
     <div className="min-h-screen font-sans bg-neutral-950 text-white relative overflow-hidden">
@@ -39,9 +71,11 @@ const Login = () => {
             </div>
             <span className="text-2xl font-bold text-white">NoteHub</span>
           </div>
-          <button onClick={() => navigate('/')} className="px-3 py-2 rounded-2xl text-l font-bold border-2 border-neutral-700/50 bg-neutral-800/20 backdrop-blur-xl text-white hover:border-neutral-600/70 hover:bg-neutral-700/30 transition-all duration-300 transform hover:scale-105">
-            <ArrowLeft className="w-4 h-4 inline-block mr-1" />
-            Back to Home
+          <button
+            onClick={() => navigate('/')}
+            className="px-3 py-2 rounded-2xl text-l font-bold border-2 border-neutral-700/50 bg-neutral-800/20 backdrop-blur-xl text-white hover:border-neutral-600/70 hover:bg-neutral-700/30 transition-all duration-300 transform hover:scale-105"
+          >
+            <ArrowLeft className="w-4 h-4 inline-block mr-1" /> Back to Home
           </button>
         </div>
       </header>
@@ -100,9 +134,7 @@ const Login = () => {
                     className="absolute inset-y-0 right-0 pr-3 flex items-center"
                     onClick={() => setShowPassword(!showPassword)}
                   >
-                    {showPassword 
-                      ? <EyeOff className="h-5 w-5 text-gray-400" /> 
-                      : <Eye className="h-5 w-5 text-gray-400" />}
+                    {showPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
                   </button>
                 </div>
               </div>
@@ -114,13 +146,15 @@ const Login = () => {
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
+
+              <div id="googleSignInDiv" className="w-full mt-4"></div>
             </div>
           </div>
 
           <p className="text-sm text-center text-neutral-400">
             Don't have an account?{' '}
             <button
-              className="text-white font-semibold "
+              className="text-white font-semibold"
               onClick={() => navigate('/signup')}
             >
               Sign up

@@ -1,131 +1,61 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { login as apiLogin, signup as apiSignup, googleLogin as apiGoogleLogin } from '../services/api.js';
+import { createContext, useContext, useState, useEffect } from "react";
+import { login, signup, googleLogin } from "../services/api";
+import React from "react";
 
 const AuthContext = createContext();
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
 
-  // Since localStorage is not available in artifacts, we'll simulate the auth state
   useEffect(() => {
-    // Simulate checking for stored auth data
-    // In a real app, this would check localStorage/sessionStorage
-    setTimeout(() => {
-      setLoading(false);
-    }, 500);
+    const token = localStorage.getItem("authToken");
+    const savedUser = localStorage.getItem("authUser");
+    if (token && savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
   }, []);
 
-  const login = async (email, password) => {
-    try {
-      // For demo purposes, we'll do simple validation
-      if (email === 'demo@notehub.com' && password === 'password') {
-        const userData = {
-          id: 1,
-          firstname: 'John',
-          lastname: 'Doe',
-          email: email
-        };
-        
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        setUser(userData);
-        return { success: true };
-      } else {
-        return { 
-          success: false, 
-          error: 'Invalid email or password. Try demo@notehub.com with password: password' 
-        };
-      }
-    } catch (error) {
-      return { 
-        success: false, 
-        error: 'Login failed. Please try again.' 
-      };
+  const loginUser = async (formData) => {
+    const result = await login(formData);
+    if (result.success) {
+      localStorage.setItem("authToken", result.token);
+      localStorage.setItem("authUser", JSON.stringify(result.user));
+      setUser(result.user);
     }
+    return result;
   };
 
-  const signup = async (firstname, lastname, email, password) => {
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Mock successful signup
-      return { success: true };
-
-      // In a real app, you would use:
-      // await apiSignup(firstname, lastname, email, password);
-      // return { success: true };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Signup failed' 
-      };
+  const signupUser = async (formData) => {
+    const result = await signup(formData);
+    if (result.success) {
+      localStorage.setItem("authToken", result.token);
+      localStorage.setItem("authUser", JSON.stringify(result.user));
+      setUser(result.user);
     }
+    return result;
   };
 
-  const googleLogin = async (token) => {
-    try {
-      // Simulate Google login
-      const mockResponse = {
-        token: 'mock-google-jwt-token',
-        user: {
-          id: 2,
-          firstname: 'Google',
-          lastname: 'User',
-          email: 'google.user@gmail.com'
-        }
-      };
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUser(mockResponse.user);
-      return { success: true };
-
-      // In a real app, you would use:
-      // const response = await apiGoogleLogin(token);
-      // const { token: appToken, user: userData } = response;
-      // localStorage.setItem('token', appToken);
-      // localStorage.setItem('user', JSON.stringify(userData));
-      // setUser(userData);
-      // return { success: true };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Google login failed' 
-      };
+  const googleLoginUser = async (credential) => {
+    const result = await googleLogin(credential);
+    if (result.success) {
+      localStorage.setItem("authToken", result.token);
+      localStorage.setItem("authUser", JSON.stringify(result.user));
+      setUser(result.user);
     }
+    return result;
   };
 
   const logout = () => {
-    // In artifacts, we just clear the in-memory state
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("authUser");
     setUser(null);
-    
-    // In a real app, you would also clear localStorage:
-    // localStorage.removeItem('token');
-    // localStorage.removeItem('user');
-  };
-
-  const value = {
-    user,
-    login,
-    signup,
-    googleLogin,
-    logout,
-    loading
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ user, loginUser, signupUser, googleLoginUser, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
+
+export const useAuth = () => useContext(AuthContext);

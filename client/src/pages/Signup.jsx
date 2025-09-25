@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { BookOpen, Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
@@ -17,7 +17,7 @@ const Signup = () => {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { signup } = useAuth();
+  const { signup, googleLogin } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -45,16 +45,49 @@ const Signup = () => {
     setLoading(true);
     setError('');
 
-    const result = await signup(formData.firstname, formData.lastname, formData.email, formData.password);
-
-    if (result.success) {
-      setSuccess('Account created successfully! Please sign in.');
-      setTimeout(() => navigate('/login'), 2000);
-    } else {
-      setError(result.error);
+    try {
+      const result = await signup(formData.firstname, formData.lastname, formData.email, formData.password);
+      if (result.success) {
+        setSuccess('Account created successfully! Redirecting to login...');
+        setTimeout(() => navigate('/login'), 2000);
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      setError('Signup failed. Please try again.');
     }
+
     setLoading(false);
   };
+
+  const handleGoogleResponse = async (response) => {
+    try {
+      const res = await googleLogin(response.credential);
+      if (res.success) {
+        navigate('/dashboard');
+      } else {
+        setError(res.error);
+      }
+    } catch (err) {
+      setError('Google signup failed. Please try again.');
+    }
+  };
+
+  useEffect(() => {
+    /* global google */
+    if (window.google) {
+      google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        callback: handleGoogleResponse,
+      });
+      google.accounts.id.renderButton(
+        document.getElementById('googleSignUpDiv'),
+        { theme: 'outline', size: 'large', width: 240 }
+      );
+    } else {
+      console.error('Google Identity Services not loaded. Make sure script is included in index.html');
+    }
+  }, []);
 
   return (
     <div className="min-h-screen font-sans bg-neutral-950 text-white relative overflow-hidden">
@@ -66,7 +99,10 @@ const Signup = () => {
             </div>
             <span className="text-2xl font-bold text-white">NoteHub</span>
           </div>
-          <button onClick={() => navigate('/')} className="px-3 py-2 rounded-2xl text-l font-bold border-2 border-neutral-700/50 bg-neutral-800/20 backdrop-blur-xl text-white hover:border-neutral-600/70 hover:bg-neutral-700/30 transition-all duration-300 transform hover:scale-105 shadow-2xl shadow-neutral-900/30">
+          <button
+            onClick={() => navigate('/')}
+            className="px-3 py-2 rounded-2xl text-l font-bold border-2 border-neutral-700/50 bg-neutral-800/20 backdrop-blur-xl text-white hover:border-neutral-600/70 hover:bg-neutral-700/30 transition-all duration-300 transform hover:scale-105 shadow-2xl shadow-neutral-900/30"
+          >
             <ArrowLeft className="w-4 h-4 inline-block mr-1" /> Back to Home
           </button>
         </div>
@@ -80,21 +116,21 @@ const Signup = () => {
           </p>
 
           <div className="py-8 px-6 shadow-2xl rounded-3xl border border-neutral-700 bg-neutral-900/80 backdrop-blur-lg transition-all duration-300">
+            {error && (
+              <div className="border rounded p-4 mb-4 flex items-center space-x-2 bg-red-800 border-red-600 text-red-400">
+                <AlertCircle className="w-5 h-5 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {success && (
+              <div className="border rounded p-4 mb-4 flex items-center space-x-2 bg-neutral-800 border-neutral-700 text-green-400">
+                <CheckCircle className="w-5 h-5 mt-0.5" />
+                <span>{success}</span>
+              </div>
+            )}
+
             <form className="space-y-6" onSubmit={handleSubmit}>
-              {error && (
-                <div className="border rounded p-4 mb-4 flex items-center space-x-2 bg-red-800 border-red-600 text-red-400">
-                  <AlertCircle className="w-5 h-5 mt-0.5" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {success && (
-                <div className="border rounded p-4 mb-4 flex items-center space-x-2 bg-neutral-800 border-neutral-700 text-green-400">
-                  <CheckCircle className="w-5 h-5 mt-0.5" />
-                  <span>{success}</span>
-                </div>
-              )}
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2 text-white">First name</label>
@@ -221,14 +257,16 @@ const Signup = () => {
               >
                 {loading ? 'Creating account...' : 'Create account'}
               </button>
-
-              <p className="text-sm text-center text-neutral-400">
-                Already have an account?{' '}
-                <Link to="/login" className="font-semibold text-white ">
-                  Sign in
-                </Link>
-              </p>
             </form>
+
+            <div id="googleSignUpDiv" className="w-full mt-4"></div>
+
+            <p className="text-sm text-center text-neutral-400 mt-4">
+              Already have an account?{' '}
+              <Link to="/login" className="font-semibold text-white ">
+                Sign in
+              </Link>
+            </p>
           </div>
         </div>
       </div>

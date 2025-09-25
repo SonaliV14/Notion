@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   BookOpen, Users, Zap, Shield, ArrowRight, Star, Globe, Smartphone,
   Menu, X
 } from 'lucide-react';
+import Header from "../components/Header";
+import Footer from "../components/Footer";
 
 const LandingPage = () => {
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const features = [
@@ -40,31 +44,7 @@ const LandingPage = () => {
         <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-neutral-800/5 to-transparent"></div>
       </div>
 
-      {/* Black Header */}
-      <header className="fixed top-0 w-full bg-black border-b border-neutral-800 z-50 shadow-2xl shadow-black/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-11 h-11 rounded-3xl flex items-center justify-center bg-white shadow-2xl shadow-black/20 border border-neutral-800">
-                <BookOpen className="w-6 h-6 text-black" />
-              </div>
-              <span className="text-2xl font-black tracking-tight text-white">NoteHub</span>
-            </div>
-
-            <nav className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-neutral-400 hover:text-white font-medium transition-all duration-300">Features</a>
-              <a href="#testimonials" className="text-neutral-400 hover:text-white font-medium transition-all duration-300">Reviews</a>
-              <a href="#pricing" className="text-neutral-400 hover:text-white font-medium transition-all duration-300">Pricing</a>
-              <a href="/login" className="text-neutral-400 hover:text-white font-medium transition-all duration-300">Sign In</a>
-              <a href="/signup" className="px-6 py-3 rounded-2xl font-bold bg-white text-black hover:bg-neutral-100 transition-all">Get Started</a>
-            </nav>
-
-            <button className="md:hidden p-2 rounded-2xl hover:bg-neutral-800 transition-all duration-300" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-              {mobileMenuOpen ? <X className="w-6 h-6 text-white" /> : <Menu className="w-6 h-6 text-white" />}
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-40 pt-20 bg-black backdrop-blur-2xl">
@@ -78,7 +58,6 @@ const LandingPage = () => {
         </div>
       )}
 
-      {/* Hero Section */}
       <section className="pt-32 pb-20 relative text-center">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <h1 className="text-6xl md:text-8xl font-black mb-8 leading-[0.9] tracking-tighter">
@@ -93,8 +72,11 @@ const LandingPage = () => {
               <span>Get NoteHub free</span>
               <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform duration-300" />
             </a>
-            <button className="px-12 py-6 rounded-3xl text-xl font-bold border-2 border-neutral-700/50 bg-neutral-800/20 backdrop-blur-xl text-white hover:border-neutral-600/70 hover:bg-neutral-700/30 transition-all duration-300 transform hover:scale-105 shadow-2xl shadow-neutral-900/30">
-              Watch Demo
+            <button
+              onClick={() => navigate('/contact-us')}
+              className="px-12 py-6 rounded-3xl text-xl font-bold text-white border-2 border-neutral-700 bg-transparent transition-all duration-300 hover:bg-neutral-800 hover:scale-105 shadow-2xl shadow-black/20"
+            >
+              Contact Us
             </button>
           </div>
         </div>
@@ -195,8 +177,11 @@ const LandingPage = () => {
               <span>Start for free</span>
               <ArrowRight className="w-6 h-6" />
             </a>
-            <button className="px-12 py-6 rounded-2xl text-xl font-bold text-white border-2 border-neutral-700 bg-transparent transition-all duration-300 hover:bg-neutral-800 hover:scale-105 shadow-2xl shadow-black/20">
-              Contact Sales
+            <button
+              onClick={() => navigate('/contact-us')}
+              className="px-12 py-6 rounded-2xl text-xl font-bold text-white border-2 border-neutral-700 bg-transparent transition-all duration-300 hover:bg-neutral-800 hover:scale-105 shadow-2xl shadow-black/20"
+            >
+              Contact Us
             </button>
           </div>
 
@@ -206,54 +191,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-16 bg-neutral-900 relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-9 h-9 rounded-2xl flex items-center justify-center bg-white text-black shadow-2xl border">
-                  <BookOpen className="w-5 h-5" />
-                </div>
-                <span className="text-2xl font-bold text-white">NoteHub</span>
-              </div>
-              <p className="text-neutral-500">The connected workspace for modern teams.</p>
-            </div>
-
-            <div>
-              <h3 className="font-bold text-white mb-4">Product</h3>
-              <ul className="space-y-3">
-                <li><a href="#" className="text-neutral-400 hover:text-white">Features</a></li>
-                <li><a href="#" className="text-neutral-400 hover:text-white">Pricing</a></li>
-                <li><a href="#" className="text-neutral-400 hover:text-white">Updates</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-bold text-white mb-4">Company</h3>
-              <ul className="space-y-3">
-                <li><a href="#" className="text-neutral-400 hover:text-white">About</a></li>
-                <li><a href="#" className="text-neutral-400 hover:text-white">Careers</a></li>
-                <li><a href="#" className="text-neutral-400 hover:text-white">Contact</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-bold text-white mb-4">Support</h3>
-              <ul className="space-y-3">
-                <li><a href="#" className="text-neutral-400 hover:text-white">Help Center</a></li>
-                <li><a href="#" className="text-neutral-400 hover:text-white">Privacy Policy</a></li>
-                <li><a href="#" className="text-neutral-400 hover:text-white">Terms of Service</a></li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="mt-12 text-center text-neutral-500 text-sm">
-            &copy; {new Date().getFullYear()} NoteHub. All rights reserved.
-          </div>
-        </div>
-      </footer>
-
+      <Footer />
     </div>
   );
 };
