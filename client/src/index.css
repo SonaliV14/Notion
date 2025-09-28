@@ -19,7 +19,7 @@
     min-height: 100vh;
   }
 
-  /* Enhanced custom scrollbar */
+  /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 8px;
   }
@@ -79,7 +79,7 @@
     border: 1px solid rgba(255, 255, 255, 0.2);
   }
 
-  /* Enhanced gradient text */
+  /* Gradient text */
   .gradient-text {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     -webkit-background-clip: text;
@@ -100,7 +100,7 @@
   }
 }
 
-/* Enhanced animations */
+/* Animations */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -223,7 +223,7 @@ button, a, input, select, textarea {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Enhanced focus styles for accessibility */
+/* Focus styles for accessibility */
 button:focus, a:focus, input:focus, select:focus, textarea:focus {
   outline: 2px solid #3b82f6;
   outline-offset: 2px;
@@ -258,7 +258,7 @@ button:focus, a:focus, input:focus, select:focus, textarea:focus {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Improved loading spinner */
+/* Loading spinner */
 @keyframes spin-smooth {
   to {
     transform: rotate(360deg);
@@ -315,7 +315,7 @@ button:focus, a:focus, input:focus, select:focus, textarea:focus {
   background: linear-gradient(135deg, #fdbb2d 0%, #22c1c3 100%);
 }
 
-/* Improved text selection */
+/* Text selection */
 ::selection {
   background: rgba(59, 130, 246, 0.3);
   color: inherit;

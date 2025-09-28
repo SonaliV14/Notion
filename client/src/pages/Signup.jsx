@@ -4,6 +4,9 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { BookOpen, Eye, EyeOff, Mail, Lock, User, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
 
 const Signup = () => {
+  const { signup, googleLogin } = useAuth();
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     firstname: '',
     lastname: '',
@@ -17,13 +20,10 @@ const Signup = () => {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { signup, googleLogin } = useAuth();
-  const navigate = useNavigate();
-
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (error) setError('');
-    if (success) setSuccess('');
+    setError('');
+    setSuccess('');
   };
 
   const validateForm = () => {
@@ -43,51 +43,54 @@ const Signup = () => {
     if (!validateForm()) return;
 
     setLoading(true);
-    setError('');
 
     try {
-      const result = await signup(formData.firstname, formData.lastname, formData.email, formData.password);
-      if (result.success) {
+      const res = await signup({
+        firstname: formData.firstname.trim(),
+        lastname: formData.lastname.trim(),
+        email: formData.email.trim(),
+        password: formData.password
+      });
+
+      if (res?.token) {
         setSuccess('Account created successfully! Redirecting to login...');
         setTimeout(() => navigate('/login'), 2000);
       } else {
-        setError(result.error);
+        setError(res?.message || 'Signup failed');
       }
     } catch (err) {
-      setError('Signup failed. Please try again.');
+      setError('Server error, please try again');
     }
 
     setLoading(false);
   };
 
-  const handleGoogleResponse = async (response) => {
-    try {
-      const res = await googleLogin(response.credential);
-      if (res.success) {
-        navigate('/dashboard');
-      } else {
-        setError(res.error);
-      }
-    } catch (err) {
-      setError('Google signup failed. Please try again.');
-    }
-  };
+  // const handleGoogleResponse = async (response) => {
+  //   try {
+  //     const res = await googleLogin(response.credential);
+  //     if (res?.token) {
+  //       navigate('/dashboard');
+  //     } else {
+  //       setError(res?.message || 'Google signup failed');
+  //     }
+  //   } catch (err) {
+  //     setError('Google signup failed. Please try again.');
+  //   }
+  // };
 
-  useEffect(() => {
-    /* global google */
-    if (window.google) {
-      google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-        callback: handleGoogleResponse,
-      });
-      google.accounts.id.renderButton(
-        document.getElementById('googleSignUpDiv'),
-        { theme: 'outline', size: 'large', width: 240 }
-      );
-    } else {
-      console.error('Google Identity Services not loaded. Make sure script is included in index.html');
-    }
-  }, []);
+  // useEffect(() => {
+  //   /* global google */
+  //   if (window.google) {
+  //     google.accounts.id.initialize({
+  //       client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+  //       callback: handleGoogleResponse,
+  //     });
+  //     google.accounts.id.renderButton(
+  //       document.getElementById('googleSignUpDiv'),
+  //       { theme: 'outline', size: 'large', width: 240 }
+  //     );
+  //   }
+  // }, []);
 
   return (
     <div className="min-h-screen font-sans bg-neutral-950 text-white relative overflow-hidden">
@@ -145,6 +148,7 @@ const Signup = () => {
                       value={formData.firstname}
                       onChange={handleChange}
                       placeholder="First name"
+                      disabled={loading}
                       className="block w-full pl-10 pr-3 py-3 border rounded-lg bg-neutral-800 border-neutral-700 text-white focus:outline-none"
                     />
                   </div>
@@ -163,6 +167,7 @@ const Signup = () => {
                       value={formData.lastname}
                       onChange={handleChange}
                       placeholder="Last name"
+                      disabled={loading}
                       className="block w-full pl-10 pr-3 py-3 border rounded-lg bg-neutral-800 border-neutral-700 text-white focus:outline-none"
                     />
                   </div>
@@ -182,6 +187,7 @@ const Signup = () => {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="Enter your email"
+                    disabled={loading}
                     className="block w-full pl-10 pr-3 py-3 border rounded-lg bg-neutral-800 border-neutral-700 text-white focus:outline-none"
                   />
                 </div>
@@ -200,6 +206,7 @@ const Signup = () => {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="Create a password"
+                    disabled={loading}
                     className="block w-full pl-10 pr-12 py-3 border rounded-lg bg-neutral-800 border-neutral-700 text-white focus:outline-none"
                   />
                   <button
@@ -225,6 +232,7 @@ const Signup = () => {
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     placeholder="Confirm your password"
+                    disabled={loading}
                     className="block w-full pl-10 pr-12 py-3 border rounded-lg bg-neutral-800 border-neutral-700 text-white focus:outline-none"
                   />
                   <button
@@ -243,6 +251,7 @@ const Signup = () => {
                   name="terms"
                   type="checkbox"
                   required
+                  disabled={loading}
                   className="h-4 w-4 rounded border-neutral-700"
                 />
                 <label htmlFor="terms" className="ml-2 text-sm text-white">
@@ -259,13 +268,10 @@ const Signup = () => {
               </button>
             </form>
 
-            <div id="googleSignUpDiv" className="w-full mt-4"></div>
+            {/* <div id="googleSignUpDiv" className="w-full mt-4"></div> */}
 
             <p className="text-sm text-center text-neutral-400 mt-4">
-              Already have an account?{' '}
-              <Link to="/login" className="font-semibold text-white ">
-                Sign in
-              </Link>
+              Already have an account? <Link to="/login" className="font-semibold text-white">Sign in</Link>
             </p>
           </div>
         </div>

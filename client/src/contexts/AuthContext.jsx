@@ -1,61 +1,81 @@
-import { createContext, useContext, useState, useEffect } from "react";
-import { login, signup, googleLogin } from "../services/api";
-import React from "react";
+import React, { createContext, useContext, useState } from "react";
+import axios from "axios";
 
 const AuthContext = createContext();
+
+export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
-  useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    const savedUser = localStorage.getItem("authUser");
-    if (token && savedUser) {
-      setUser(JSON.parse(savedUser));
+  // --------- SIGNUP ----------
+  const signup = async (formData) => {
+    try {
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_URL}/auth/signup`,
+        formData
+      );
+      // console.log(res.data.token)
+      setUser(res.data.user);
+      localStorage.setItem("token", res.data.token);
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || "Signup failed", 
+      };
     }
-  }, []);
-
-  const loginUser = async (formData) => {
-    const result = await login(formData);
-    if (result.success) {
-      localStorage.setItem("authToken", result.token);
-      localStorage.setItem("authUser", JSON.stringify(result.user));
-      setUser(result.user);
-    }
-    return result;
   };
 
-  const signupUser = async (formData) => {
-    const result = await signup(formData);
-    if (result.success) {
-      localStorage.setItem("authToken", result.token);
-      localStorage.setItem("authUser", JSON.stringify(result.user));
-      setUser(result.user);
+  // --------- LOGIN ----------
+  const login = async (formData) => {
+    try {
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_URL}/auth/login`,
+        formData
+      );
+      setUser(res.data.user);
+      localStorage.setItem("token", res.data.token);
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || "Login failed", // ✅ fixed
+      };
     }
-    return result;
   };
 
-  const googleLoginUser = async (credential) => {
-    const result = await googleLogin(credential);
-    if (result.success) {
-      localStorage.setItem("authToken", result.token);
-      localStorage.setItem("authUser", JSON.stringify(result.user));
-      setUser(result.user);
+  // --------- GOOGLE LOGIN ----------
+  const googleLogin = async (credential) => {
+    try {
+      // Send the raw Google ID token to backend
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_URL}/auth/google-login`,
+        { token: credential } // ✅ match backend expectation
+      );
+
+      setUser(res.data.user);
+      localStorage.setItem("token", res.data.token);
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        error: err.response?.data?.message || "Google login failed", // ✅ fixed
+      };
     }
-    return result;
   };
 
+  // --------- LOGOUT ----------
   const logout = () => {
-    localStorage.removeItem("authToken");
-    localStorage.removeItem("authUser");
     setUser(null);
+    localStorage.removeItem("token");
   };
 
   return (
-    <AuthContext.Provider value={{ user, loginUser, signupUser, googleLoginUser, logout }}>
+    <AuthContext.Provider
+      value={{ user, signup, login, googleLogin, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
-
-export const useAuth = () => useContext(AuthContext);

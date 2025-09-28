@@ -7,7 +7,7 @@ const api = axios.create({
 export const signup = async (formData) => {
   try {
     const { data } = await api.post("/auth/signup", formData);
-    return data; // { success, token, user, error? }
+    return data; 
   } catch (err) {
     return { success: false, error: err.response?.data?.error || "Signup failed" };
   }
@@ -16,7 +16,7 @@ export const signup = async (formData) => {
 export const login = async (formData) => {
   try {
     const { data } = await api.post("/auth/login", formData);
-    return data; // { success, token, user, error? }
+    return data; 
   } catch (err) {
     return { success: false, error: err.response?.data?.error || "Login failed" };
   }
@@ -24,8 +24,8 @@ export const login = async (formData) => {
 
 export const googleLogin = async (credential) => {
   try {
-    const { data } = await api.post("/auth/google", { credential });
-    return data; // { success, token, user, error? }
+    const { data } = await api.post("/auth/google-login", { tokenId: credential });
+    return data;
   } catch (err) {
     return { success: false, error: err.response?.data?.error || "Google login failed" };
   }

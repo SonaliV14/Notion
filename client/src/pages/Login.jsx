@@ -1,47 +1,59 @@
-import React, { useState, useEffect } from 'react';
-import { BookOpen, Eye, EyeOff, Mail, Lock, AlertCircle, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import React, { useState, useEffect } from "react";
+import {
+  BookOpen,
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  AlertCircle,
+  ArrowLeft,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext.jsx";
 
 const Login = () => {
   const navigate = useNavigate();
   const { login, googleLogin } = useAuth();
-  const [formData, setFormData] = useState({ email: '', password: '' });
+
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (error) setError('');
+    if (error) setError("");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setError("");
+
     try {
       const res = await login(formData.email, formData.password);
-      if (res.success) {
-        navigate('/dashboard');
+      if (res?.token) {
+        navigate("/dashboard");
       } else {
-        setError(res.error);
+        setError(res?.error || "Invalid credentials");
       }
     } catch (err) {
-      setError('Login failed. Please try again.');
+      setError("Login failed. Please try again.");
     }
+
     setLoading(false);
   };
 
   const handleGoogleResponse = async (response) => {
     try {
       const res = await googleLogin(response.credential);
-      if (res.success) {
-        navigate('/dashboard');
+      if (res?.token) {
+        navigate("/dashboard");
       } else {
-        setError(res.error);
+        setError(res?.error || "Google login failed");
       }
     } catch (err) {
-      setError('Google login failed. Please try again.');
+      setError("Google login failed. Please try again.");
     }
   };
 
@@ -53,11 +65,9 @@ const Login = () => {
         callback: handleGoogleResponse,
       });
       google.accounts.id.renderButton(
-        document.getElementById('googleSignInDiv'),
-        { theme: 'outline', size: 'large', width: 240 }
+        document.getElementById("googleSignInDiv"),
+        { theme: "outline", size: "large", width: 240 }
       );
-    } else {
-      console.error('Google Identity Services not loaded. Make sure script is included in index.html');
     }
   }, []);
 
@@ -72,7 +82,7 @@ const Login = () => {
             <span className="text-2xl font-bold text-white">NoteHub</span>
           </div>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate("/")}
             className="px-3 py-2 rounded-2xl text-l font-bold border-2 border-neutral-700/50 bg-neutral-800/20 backdrop-blur-xl text-white hover:border-neutral-600/70 hover:bg-neutral-700/30 transition-all duration-300 transform hover:scale-105"
           >
             <ArrowLeft className="w-4 h-4 inline-block mr-1" /> Back to Home
@@ -82,7 +92,9 @@ const Login = () => {
 
       <div className="relative min-h-screen flex items-center justify-center pt-24 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-6">
-          <h2 className="text-3xl font-bold text-white text-center">Welcome back</h2>
+          <h2 className="text-3xl font-bold text-white text-center">
+            Welcome back
+          </h2>
           <p className="text-base text-neutral-400 text-center">
             Sign in to your account to continue your journey
           </p>
@@ -95,9 +107,11 @@ const Login = () => {
               </div>
             )}
 
-            <div className="space-y-4">
+            <form className="space-y-4" onSubmit={handleSubmit}>
               <div>
-                <label className="block text-sm font-semibold mb-1 text-white">Email address</label>
+                <label className="block text-sm font-semibold mb-1 text-white">
+                  Email address
+                </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Mail className="h-5 w-5 text-gray-400" />
@@ -115,14 +129,16 @@ const Login = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-1 text-white">Password</label>
+                <label className="block text-sm font-semibold mb-1 text-white">
+                  Password
+                </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Lock className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
                     name="password"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     value={formData.password}
                     onChange={handleChange}
                     required
@@ -134,28 +150,32 @@ const Login = () => {
                     className="absolute inset-y-0 right-0 pr-3 flex items-center"
                     onClick={() => setShowPassword(!showPassword)}
                   >
-                    {showPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400" />
+                    )}
                   </button>
                 </div>
               </div>
 
               <button
-                onClick={handleSubmit}
+                type="submit"
                 disabled={loading}
                 className="w-full py-3 text-base font-semibold rounded-2xl bg-white text-black hover:bg-neutral-200 transition-all"
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {loading ? "Signing in..." : "Sign In"}
               </button>
+            </form>
 
-              <div id="googleSignInDiv" className="w-full mt-4"></div>
-            </div>
+            <div id="googleSignInDiv" className="w-full mt-4"></div>
           </div>
 
           <p className="text-sm text-center text-neutral-400">
-            Don't have an account?{' '}
+            Don't have an account?{" "}
             <button
               className="text-white font-semibold"
-              onClick={() => navigate('/signup')}
+              onClick={() => navigate("/signup")}
             >
               Sign up
             </button>
