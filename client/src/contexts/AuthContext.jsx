@@ -1,12 +1,17 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
 
+// Create context
 const AuthContext = createContext();
-
 export const useAuth = () => useContext(AuthContext);
 
+// Provider component
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  // Initialize user from localStorage if available
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem("user");
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
 
   // --------- SIGNUP ----------
   const signup = async (formData) => {
@@ -15,14 +20,15 @@ export const AuthProvider = ({ children }) => {
         `${import.meta.env.VITE_API_URL}/auth/signup`,
         formData
       );
-      // console.log(res.data.token)
       setUser(res.data.user);
+      console.log(res.data.token);
       localStorage.setItem("token", res.data.token);
+      localStorage.setItem("user", JSON.stringify(res.data.user));
       return { success: true };
     } catch (err) {
       return {
         success: false,
-        error: err.response?.data?.message || "Signup failed", 
+        error: err.response?.data?.message || "Signup failed",
       };
     }
   };
@@ -36,31 +42,12 @@ export const AuthProvider = ({ children }) => {
       );
       setUser(res.data.user);
       localStorage.setItem("token", res.data.token);
+      localStorage.setItem("user", JSON.stringify(res.data.user));
       return { success: true };
     } catch (err) {
       return {
         success: false,
-        error: err.response?.data?.message || "Login failed", // ✅ fixed
-      };
-    }
-  };
-
-  // --------- GOOGLE LOGIN ----------
-  const googleLogin = async (credential) => {
-    try {
-      // Send the raw Google ID token to backend
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL}/auth/google-login`,
-        { token: credential } // ✅ match backend expectation
-      );
-
-      setUser(res.data.user);
-      localStorage.setItem("token", res.data.token);
-      return { success: true };
-    } catch (err) {
-      return {
-        success: false,
-        error: err.response?.data?.message || "Google login failed", // ✅ fixed
+        error: err.response?.data?.message || "Login failed",
       };
     }
   };
@@ -69,12 +56,21 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
   };
 
+  // --------- Attach token to axios headers automatically ----------
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    } else {
+      delete axios.defaults.headers.common["Authorization"];
+    }
+  }, [user]);
+
   return (
-    <AuthContext.Provider
-      value={{ user, signup, login, googleLogin, logout }}
-    >
+    <AuthContext.Provider value={{ user, signup, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

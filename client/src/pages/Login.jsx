@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   BookOpen,
   Eye,
@@ -13,7 +13,7 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, googleLogin } = useAuth();
+  const { login } = useAuth();
 
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -25,51 +25,51 @@ const Login = () => {
     if (error) setError("");
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
 
-    try {
-      const res = await login(formData.email, formData.password);
-      if (res?.token) {
-        navigate("/dashboard");
-      } else {
-        setError(res?.error || "Invalid credentials");
-      }
-    } catch (err) {
-      setError("Login failed. Please try again.");
+  try {
+    const res = await login(formData); 
+    if (res.success) {                 
+      navigate("/dashboard");
+    } else {
+      setError(res.error || "Invalid credentials");
     }
+  } catch (err) {
+    setError("Login failed. Please try again.");
+  }
 
-    setLoading(false);
-  };
+  setLoading(false);
+};
 
-  const handleGoogleResponse = async (response) => {
-    try {
-      const res = await googleLogin(response.credential);
-      if (res?.token) {
-        navigate("/dashboard");
-      } else {
-        setError(res?.error || "Google login failed");
-      }
-    } catch (err) {
-      setError("Google login failed. Please try again.");
-    }
-  };
+  // const handleGoogleResponse = async (response) => {
+  //   try {
+  //     const res = await googleLogin(response.credential);
+  //     if (res?.token) {
+  //       navigate("/dashboard");
+  //     } else {
+  //       setError(res?.error || "Google login failed");
+  //     }
+  //   } catch (err) {
+  //     setError("Google login failed. Please try again.");
+  //   }
+  // };
 
-  useEffect(() => {
-    /* global google */
-    if (window.google) {
-      google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-        callback: handleGoogleResponse,
-      });
-      google.accounts.id.renderButton(
-        document.getElementById("googleSignInDiv"),
-        { theme: "outline", size: "large", width: 240 }
-      );
-    }
-  }, []);
+  // useEffect(() => {
+  //   /* global google */
+  //   if (window.google) {
+  //     google.accounts.id.initialize({
+  //       client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+  //       callback: handleGoogleResponse,
+  //     });
+  //     google.accounts.id.renderButton(
+  //       document.getElementById("googleSignInDiv"),
+  //       { theme: "outline", size: "large", width: 240 }
+  //     );
+  //   }
+  // }, []);
 
   return (
     <div className="min-h-screen font-sans bg-neutral-950 text-white relative overflow-hidden">
@@ -168,7 +168,7 @@ const Login = () => {
               </button>
             </form>
 
-            <div id="googleSignInDiv" className="w-full mt-4"></div>
+            {/*<div id="googleSignInDiv" className="w-full mt-4"></div>*/}
           </div>
 
           <p className="text-sm text-center text-neutral-400">
