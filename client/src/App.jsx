@@ -1,12 +1,14 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
+import { PageProvider } from "./contexts/PageContext.jsx";
 import LandingPage from './pages/LandingPage.jsx';
 import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
 import ContactUs from './pages/ContactUs.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -41,11 +43,13 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <div className="min-h-screen bg-black">
-          <AppRoutes />
-        </div>
-      </Router>
+      <PageProvider>
+        <Router>
+          <div className="min-h-screen bg-black">
+            <AppRoutes />
+          </div>
+        </Router>
+      </PageProvider>
     </AuthProvider>
   );
 }

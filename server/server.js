@@ -2,7 +2,8 @@ import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
-import UserRouter from "./routes/UserRoutes.js";
+import UserRoutes from "./routes/UserRoutes.js";
+import PageRoutes from "./routes/PageRoutes.js";
 
 dotenv.config();
 
@@ -15,7 +16,8 @@ app.use(cors({
 app.use(express.json());
 
 // Routes
-app.use("/api/auth", UserRouter);
+app.use("/api/auth", UserRoutes);  // Auth routes: /api/auth/signup, /api/auth/login
+app.use("/api/pages", PageRoutes); // ✅ FIXED: Page routes should be /api/pages/*
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI)
