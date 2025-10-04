@@ -36,7 +36,7 @@ export const login = async (formData) => {
 
 // -------------------- PAGE APIs --------------------
 
-// Get pages of logged-in user
+// Get active pages of logged-in user
 export const getUserPages = async (token) => {
   try {
     const { data } = await api.get("/pages", {
@@ -47,6 +47,21 @@ export const getUserPages = async (token) => {
     return {
       success: false,
       error: err.response?.data?.error || "Failed to fetch pages",
+    };
+  }
+};
+
+// Get trash pages
+export const getTrashPages = async (token) => {
+  try {
+    const { data } = await api.get("/pages/trash", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      error: err.response?.data?.error || "Failed to fetch trash pages",
     };
   }
 };
@@ -81,7 +96,7 @@ export const updatePage = async (pageId, pageData, token) => {
   }
 };
 
-// Delete a page
+// Soft delete a page (move to trash)
 export const deletePage = async (pageId, token) => {
   try {
     const { data } = await api.delete(`/pages/${pageId}`, {
@@ -92,6 +107,36 @@ export const deletePage = async (pageId, token) => {
     return {
       success: false,
       error: err.response?.data?.error || "Failed to delete page",
+    };
+  }
+};
+
+// Restore page from trash
+export const restorePage = async (pageId, token) => {
+  try {
+    const { data } = await api.patch(`/pages/${pageId}/restore`, {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      error: err.response?.data?.error || "Failed to restore page",
+    };
+  }
+};
+
+// Permanently delete a page
+export const permanentDeletePage = async (pageId, token) => {
+  try {
+    const { data } = await api.delete(`/pages/${pageId}/permanent`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      error: err.response?.data?.error || "Failed to permanently delete page",
     };
   }
 };

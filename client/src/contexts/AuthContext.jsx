@@ -1,15 +1,11 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
 
-// Create the context
 const AuthContext = createContext();
 
-// Custom hook to use auth context easily
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-  // Initialize user from localStorage (if available)
-  // Include token in user object for easier access later
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem("user");
     const savedToken = localStorage.getItem("token");
@@ -18,7 +14,14 @@ export const AuthProvider = ({ children }) => {
       : null;
   });
 
-  // ---------------- SIGNUP ----------------
+  // ✅ ADD THIS: Set axios header on mount if token exists
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    }
+  }, []);
+
   const signup = async (formData) => {
     try {
       const res = await axios.post(
@@ -26,17 +29,12 @@ export const AuthProvider = ({ children }) => {
         formData
       );
 
-      // Include token inside user object
       const userData = { ...res.data.user, token: res.data.token };
-
-      // Save in state
       setUser(userData);
 
-      // Save in localStorage for persistence
       localStorage.setItem("user", JSON.stringify(res.data.user));
       localStorage.setItem("token", res.data.token);
 
-      // Automatically set axios default header for Authorization
       axios.defaults.headers.common["Authorization"] = `Bearer ${res.data.token}`;
 
       return { success: true };
@@ -48,7 +46,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ---------------- LOGIN ----------------
   const login = async (formData) => {
     try {
       const res = await axios.post(
@@ -73,7 +70,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ---------------- LOGOUT ----------------
   const logout = () => {
     setUser(null);
     localStorage.removeItem("user");

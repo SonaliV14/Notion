@@ -7,14 +7,13 @@ import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
 import ContactUs from './pages/ContactUs.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import NewPage from './pages/NewPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
-
 
 function AppRoutes() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    // Optionally show a loader while checking auth status
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">
         Loading...
@@ -33,6 +32,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/page/:id"
+        element={
+          <ProtectedRoute>
+            <NewPage />
           </ProtectedRoute>
         }
       />
@@ -55,4 +62,3 @@ function App() {
 }
 
 export default App;
-
