@@ -7,7 +7,6 @@ import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
 import ContactUs from './pages/ContactUs.jsx';
 import Dashboard from './pages/Dashboard.jsx';
-import NewPage from './pages/NewPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 function AppRoutes() {
@@ -32,14 +31,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/page/:id"
-        element={
-          <ProtectedRoute>
-            <NewPage />
           </ProtectedRoute>
         }
       />

@@ -1,25 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Home, FileText, Calendar, CheckSquare, Users, Settings, 
-  Plus, Search, Inbox, ChevronDown, ChevronRight, Trash2, 
-  Star, Clock, Edit3, Send, FilePlus
+  Home, FileText, Settings, Plus, Search, Inbox, ChevronDown, 
+  ChevronRight, Trash2, Clock, Edit3, FilePlus
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { usePages } from '../contexts/PageContext.jsx';
-import { useNavigate } from 'react-router-dom';
+import PageEditor from '../components/PageEditor.jsx';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const { pages, trashPages, addPage, moveToTrash, restoreFromTrash, permanentDelete, fetchTrashPages, loading } = usePages();
-  const navigate = useNavigate();
   
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showSearch, setShowSearch] = useState(false);
-  const [currentView, setCurrentView] = useState('home'); // 'home', 'my-pages', 'trash', 'create'
+  const [currentView, setCurrentView] = useState('home');
   const [expandedSections, setExpandedSections] = useState({
     private: true,
     shared: false
   });
+  const [editingPage, setEditingPage] = useState(null);
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
@@ -28,7 +27,7 @@ export default function Dashboard() {
     }));
   };
 
-  const handleAddPage = async () => {
+  const handleCreatePage = async () => {
     if (!user?.token) return;
     
     const newPage = { title: "Untitled", content: "" };
@@ -39,14 +38,27 @@ export default function Dashboard() {
       return;
     }
     
-    // Navigate to the new page or show success message
-    setCurrentView('my-pages');
+    setEditingPage(created);
+    setCurrentView('editor');
+  };
+
+  const handleOpenPage = (page) => {
+    setEditingPage(page);
+    setCurrentView('editor');
   };
 
   const handleDeletePage = async (pageId) => {
     const success = await moveToTrash(pageId);
     if (success) {
       alert("Page moved to trash");
+    }
+  };
+
+  const handleDeleteCurrentPage = async (pageId) => {
+    const success = await moveToTrash(pageId);
+    if (success) {
+      setCurrentView('home');
+      setEditingPage(null);
     }
   };
 
@@ -66,7 +78,11 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch trash when viewing trash
+  const handlePageUpdate = (updatedPage) => {
+    // Update the editing page with new data
+    setEditingPage(updatedPage);
+  };
+
   useEffect(() => {
     if (currentView === 'trash') {
       fetchTrashPages();
@@ -85,7 +101,6 @@ export default function Dashboard() {
     <div className="flex h-screen bg-neutral-900 text-white">
       {/* Sidebar */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-0'} transition-all duration-300 bg-neutral-800 flex flex-col overflow-hidden`}>
-        {/* User Section */}
         <div className="p-3">
           <div className="flex items-center justify-between p-2 hover:bg-neutral-700 rounded cursor-pointer group">
             <div className="flex items-center gap-2">
@@ -101,7 +116,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Navigation */}
         <div className="flex-1 overflow-y-auto px-2">
           <div className="space-y-0.5">
             <button 
@@ -126,11 +140,10 @@ export default function Dashboard() {
 
           <div className="my-3 border-t border-neutral-700" />
 
-          {/* New Options */}
           <div className="space-y-0.5 mb-3">
             <button 
-              onClick={() => setCurrentView('create')}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded ${currentView === 'create' ? 'bg-neutral-700' : ''}`}
+              onClick={handleCreatePage}
+              className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded ${currentView === 'editor' ? 'bg-neutral-700' : ''}`}
             >
               <FilePlus className="w-4 h-4" />
               <span>Create Page</span>
@@ -153,7 +166,6 @@ export default function Dashboard() {
 
           <div className="my-3 border-t border-neutral-700" />
 
-          {/* Private Section */}
           <div className="mb-4">
             <button 
               onClick={() => toggleSection('private')}
@@ -170,7 +182,11 @@ export default function Dashboard() {
                   <div className="px-2 py-1.5 text-sm text-gray-500">No pages yet</div>
                 ) : (
                   pages.slice(0, 5).map(page => (
-                    <button key={page._id} className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded group">
+                    <button 
+                      key={page._id} 
+                      onClick={() => handleOpenPage(page)}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded group"
+                    >
                       <FileText className="w-4 h-4" />
                       <span className="flex-1 text-left truncate">{page.title}</span>
                     </button>
@@ -180,7 +196,6 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Shared Section */}
           <div className="mb-4">
             <button 
               onClick={() => toggleSection('shared')}
@@ -200,7 +215,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Footer */}
         <div className="p-2 border-t border-neutral-700">
           <button className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded mb-1">
             <Settings className="w-4 h-4" />
@@ -241,9 +255,18 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto">
-          {/* HOME VIEW */}
-          {currentView === 'home' && (
+        {/* PAGE EDITOR VIEW */}
+        {currentView === 'editor' && editingPage && (
+          <PageEditor 
+            page={editingPage} 
+            onDelete={handleDeleteCurrentPage}
+            onUpdate={handlePageUpdate}
+          />
+        )}
+
+        {/* HOME VIEW */}
+        {currentView === 'home' && (
+          <div className="flex-1 overflow-y-auto">
             <div className="max-w-6xl mx-auto px-20 py-16">
               <div className="mb-12">
                 <h1 className="text-4xl font-bold mb-2">Good afternoon</h1>
@@ -259,6 +282,7 @@ export default function Dashboard() {
                   {pages.slice(0, 9).map((page) => (
                     <button 
                       key={page._id}
+                      onClick={() => handleOpenPage(page)}
                       className="group relative aspect-[4/3] rounded-lg overflow-hidden border border-neutral-700 hover:border-neutral-600 transition-all"
                     >
                       <div className={`w-full h-full ${page.color || 'bg-gradient-to-br from-purple-500 to-pink-500'} flex items-center justify-center`}>
@@ -273,7 +297,7 @@ export default function Dashboard() {
                     </button>
                   ))}
                   <button 
-                    onClick={handleAddPage}
+                    onClick={handleCreatePage}
                     className="aspect-[4/3] rounded-lg border border-dashed border-neutral-700 hover:border-neutral-600 hover:bg-neutral-800/50 transition-all flex items-center justify-center"
                   >
                     <Plus className="w-6 h-6 text-gray-500" />
@@ -281,25 +305,12 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* CREATE PAGE VIEW */}
-          {currentView === 'create' && (
-            <div className="max-w-4xl mx-auto px-16 py-16">
-              <h1 className="text-3xl font-bold mb-8">Create New Page</h1>
-              <button 
-                onClick={handleAddPage}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium flex items-center gap-2"
-              >
-                <Plus className="w-5 h-5" />
-                Create Page
-              </button>
-              <p className="text-gray-400 mt-4">Click the button above to create a new page</p>
-            </div>
-          )}
-
-          {/* MY PAGES VIEW */}
-          {currentView === 'my-pages' && (
+        {/* MY PAGES VIEW */}
+        {currentView === 'my-pages' && (
+          <div className="flex-1 overflow-y-auto">
             <div className="max-w-6xl mx-auto px-20 py-16">
               <div className="mb-8">
                 <h1 className="text-3xl font-bold mb-2">My Pages</h1>
@@ -314,7 +325,7 @@ export default function Dashboard() {
                   <h3 className="text-xl font-medium text-gray-400 mb-2">No pages yet</h3>
                   <p className="text-gray-500 mb-6">Create your first page to get started</p>
                   <button 
-                    onClick={handleAddPage}
+                    onClick={handleCreatePage}
                     className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium inline-flex items-center gap-2"
                   >
                     <Plus className="w-5 h-5" />
@@ -328,15 +339,18 @@ export default function Dashboard() {
                       key={page._id}
                       className="flex items-center justify-between p-4 bg-neutral-800 hover:bg-neutral-750 rounded-lg border border-neutral-700 transition-colors"
                     >
-                      <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => handleOpenPage(page)}
+                        className="flex items-center gap-3 flex-1"
+                      >
                         <FileText className="w-5 h-5 text-gray-400" />
-                        <div>
+                        <div className="text-left">
                           <h3 className="font-medium">{page.title}</h3>
                           <p className="text-sm text-gray-500">
                             Updated {new Date(page.updatedAt).toLocaleDateString()}
                           </p>
                         </div>
-                      </div>
+                      </button>
                       <button 
                         onClick={() => handleDeletePage(page._id)}
                         className="p-2 hover:bg-neutral-700 rounded text-gray-400 hover:text-red-400 transition-colors"
@@ -348,10 +362,12 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* TRASH VIEW */}
-          {currentView === 'trash' && (
+        {/* TRASH VIEW */}
+        {currentView === 'trash' && (
+          <div className="flex-1 overflow-y-auto">
             <div className="max-w-6xl mx-auto px-20 py-16">
               <div className="mb-8">
                 <h1 className="text-3xl font-bold mb-2">Trash</h1>
@@ -401,8 +417,8 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
