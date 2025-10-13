@@ -3,6 +3,7 @@ import {
   getUserPages, 
   getTrashPages,
   getFavoritePages,
+  getCollaboratedPages,
   createPage,
   updatePage as updatePageAPI,
   deletePage as deletePageAPI,
@@ -20,6 +21,7 @@ export const PageProvider = ({ children }) => {
   const [pages, setPages] = useState([]);
   const [favoritePages, setFavoritePages] = useState([]);
   const [trashPages, setTrashPages] = useState([]);
+  const [collaboratedPages, setCollaboratedPages] = useState([]);
   const [currentPage, setCurrentPage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -28,23 +30,32 @@ export const PageProvider = ({ children }) => {
   useEffect(() => {
     if (!user?.token) return;
 
-    const fetchPages = async () => {
+    const fetchInitialData = async () => {
       setLoading(true);
       setError(null);
-      const res = await getUserPages(user.token);
+      
+      try {
+        const [pagesRes, collaboratedRes] = await Promise.all([
+          getUserPages(user.token),
+          getCollaboratedPages(user.token)
+        ]);
 
-      if (res.success && Array.isArray(res.pages)) {
-        setPages(res.pages);
-      } else {
-        console.error("Error fetching pages:", res.error);
-        setError(res.error);
-        setPages([]);
+        if (pagesRes.success && Array.isArray(pagesRes.pages)) {
+          setPages(pagesRes.pages);
+        }
+
+        if (collaboratedRes.success && Array.isArray(collaboratedRes.pages)) {
+          setCollaboratedPages(collaboratedRes.pages);
+        }
+      } catch (err) {
+        console.error("Error fetching initial data:", err);
+        setError(err.message);
       }
 
       setLoading(false);
     };
 
-    fetchPages();
+    fetchInitialData();
   }, [user]);
 
   // Fetch pages with filters
@@ -57,15 +68,15 @@ export const PageProvider = ({ children }) => {
 
     if (res.success && Array.isArray(res.pages)) {
       setPages(res.pages);
+      setLoading(false);
       return res.pages;
     } else {
       console.error("Error fetching pages:", res.error);
       setError(res.error);
       setPages([]);
+      setLoading(false);
       return [];
     }
-
-    setLoading(false);
   };
 
   // Fetch favorite pages
@@ -78,15 +89,15 @@ export const PageProvider = ({ children }) => {
 
     if (res.success && Array.isArray(res.pages)) {
       setFavoritePages(res.pages);
+      setLoading(false);
       return res.pages;
     } else {
       console.error("Error fetching favorite pages:", res.error);
       setError(res.error);
       setFavoritePages([]);
+      setLoading(false);
       return [];
     }
-
-    setLoading(false);
   };
 
   // Fetch trash pages
@@ -99,15 +110,36 @@ export const PageProvider = ({ children }) => {
 
     if (res.success && Array.isArray(res.pages)) {
       setTrashPages(res.pages);
+      setLoading(false);
       return res.pages;
     } else {
       console.error("Error fetching trash pages:", res.error);
       setError(res.error);
       setTrashPages([]);
+      setLoading(false);
       return [];
     }
+  };
 
-    setLoading(false);
+  // Fetch collaborated pages
+  const fetchCollaboratedPages = async () => {
+    if (!user?.token) return;
+    
+    setLoading(true);
+    setError(null);
+    const res = await getCollaboratedPages(user.token);
+
+    if (res.success && Array.isArray(res.pages)) {
+      setCollaboratedPages(res.pages);
+      setLoading(false);
+      return res.pages;
+    } else {
+      console.error("Error fetching collaborated pages:", res.error);
+      setError(res.error);
+      setCollaboratedPages([]);
+      setLoading(false);
+      return [];
+    }
   };
 
   // Create new page
@@ -144,6 +176,9 @@ export const PageProvider = ({ children }) => {
       
       // Update in favorites if it's there
       setFavoritePages(prev => prev.map(p => p._id === pageId ? res.page : p));
+      
+      // Update in collaborated pages if it's there
+      setCollaboratedPages(prev => prev.map(p => p._id === pageId ? res.page : p));
       
       // Update current page if it's the one being edited
       if (currentPage?._id === pageId) {
@@ -219,6 +254,7 @@ export const PageProvider = ({ children }) => {
     if (res.success) {
       setPages(prev => prev.filter(p => p._id !== pageId));
       setFavoritePages(prev => prev.filter(p => p._id !== pageId));
+      setCollaboratedPages(prev => prev.filter(p => p._id !== pageId));
       
       // Clear current page if it's the one being deleted
       if (currentPage?._id === pageId) {
@@ -301,9 +337,10 @@ export const PageProvider = ({ children }) => {
     setError(null);
 
     try {
-      const [pagesRes, favoritesRes] = await Promise.all([
+      const [pagesRes, favoritesRes, collaboratedRes] = await Promise.all([
         getUserPages(user.token),
-        getFavoritePages(user.token)
+        getFavoritePages(user.token),
+        getCollaboratedPages(user.token)
       ]);
 
       if (pagesRes.success && Array.isArray(pagesRes.pages)) {
@@ -312,6 +349,10 @@ export const PageProvider = ({ children }) => {
 
       if (favoritesRes.success && Array.isArray(favoritesRes.pages)) {
         setFavoritePages(favoritesRes.pages);
+      }
+
+      if (collaboratedRes.success && Array.isArray(collaboratedRes.pages)) {
+        setCollaboratedPages(collaboratedRes.pages);
       }
     } catch (err) {
       console.error("Error refreshing pages:", err);
@@ -327,6 +368,7 @@ export const PageProvider = ({ children }) => {
       pages, 
       favoritePages,
       trashPages,
+      collaboratedPages,
       currentPage,
       loading,
       error,
@@ -344,6 +386,7 @@ export const PageProvider = ({ children }) => {
       fetchPages,
       fetchFavoritePages,
       fetchTrashPages,
+      fetchCollaboratedPages,
       searchPages,
       refreshPages,
       

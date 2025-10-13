@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Type, Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare,
   Quote, Code, Minus, AlertCircle, ChevronRight, Save, MoreHorizontal,
-  Star, Lock, Share2, Download, FileText, X, ChevronDown, Trash2, Plus,
-  GripVertical, Copy, StarOff
+  Star, Lock, Share2, Download, X, ChevronDown, Trash2, Plus,
+  GripVertical, Copy, StarOff, Users
 } from 'lucide-react';
 import { 
   updatePage, 
@@ -15,6 +15,7 @@ import {
   duplicatePage
 } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import ShareModal from './ShareModal';
 
 export default function PageEditor({ page, onDelete, onUpdate }) {
   const { user } = useAuth();
@@ -26,6 +27,7 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
   const [commandMenuPosition, setCommandMenuPosition] = useState({ top: 0, left: 0 });
   const [activeBlockId, setActiveBlockId] = useState(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [focusedBlockId, setFocusedBlockId] = useState(null);
@@ -49,6 +51,15 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
     { icon: ChevronRight, label: 'Toggle', type: 'toggle', description: 'Collapsible content' }
   ];
 
+  // Determine user permissions
+  // If userRole is undefined or null, user is the owner
+  // If isOwner is explicitly true, user is the owner
+  // If userRole is 'owner', user is the owner
+  const isOwner = page?.isOwner === true || page?.userRole === 'owner' || page?.userRole === undefined || page?.userRole === null;
+  const canEdit = isOwner || page?.userRole === 'editor' || page?.userRole === 'admin';
+  const canManage = isOwner || page?.userRole === 'admin';
+  const isViewer = page?.userRole === 'viewer';
+
   // Load page data and blocks
   useEffect(() => {
     if (page) {
@@ -65,7 +76,6 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
     const res = await getPageBlocks(page._id, user.token);
     if (res.success) {
       setBlocks(res.blocks || []);
-      // If no blocks, create initial one
       if (!res.blocks || res.blocks.length === 0) {
         handleAddBlock(null);
       }
@@ -73,7 +83,7 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
   };
 
   const handleSavePage = async () => {
-    if (!page || !user?.token) return;
+    if (!page || !user?.token || !canEdit) return;
     
     setSaving(true);
     const res = await updatePage(page._id, {
@@ -92,7 +102,7 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
   };
 
   const handleToggleFavorite = async () => {
-    if (!page || !user?.token) return;
+    if (!page || !user?.token || !isOwner) return;
     
     const res = await toggleFavorite(page._id, user.token);
     if (res.success) {
@@ -118,8 +128,14 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
     setShowMoreMenu(false);
   };
 
+  const handleShare = () => {
+    setShowShareModal(true);
+    setShowMoreMenu(false);
+  };
+
   const handleBlockContentChange = async (blockId, content) => {
-    // Don't trigger re-render immediately to prevent cursor jump
+    if (!canEdit) return;
+    
     const block = blocks.find(b => b._id === blockId);
     if (block && block.content === content) return;
 
@@ -133,6 +149,8 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
   };
 
   const handleBlockTypeChange = async (blockId, newType) => {
+    if (!canEdit) return;
+    
     setBlocks(blocks.map(b => 
       b._id === blockId ? { ...b, type: newType } : b
     ));
@@ -144,7 +162,7 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
   };
 
   const handleAddBlock = async (afterBlockId, type = 'paragraph') => {
-    if (!page || !user?.token) return;
+    if (!page || !user?.token || !canEdit) return;
 
     const afterBlock = afterBlockId ? blocks.find(b => b._id === afterBlockId) : null;
     const newOrder = afterBlock ? afterBlock.order + 1 : blocks.length;
@@ -175,7 +193,7 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
   };
 
   const handleDeleteBlock = async (blockId) => {
-    if (!user?.token || blocks.length === 1) return;
+    if (!user?.token || blocks.length === 1 || !canEdit) return;
 
     const blockIndex = blocks.findIndex(b => b._id === blockId);
     const res = await deleteBlock(blockId, user.token);
@@ -196,7 +214,8 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
   };
 
   const handleKeyDown = (e, blockId, index) => {
-    // Ctrl+Enter or Cmd+Enter creates a new block
+    if (!canEdit) return;
+    
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleAddBlock(blockId);
@@ -273,41 +292,45 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
   };
 
   const renderBlock = (block, index) => {
-    const BlockIcon = blockTypes.find(t => t.type === block.type)?.icon || Type;
-
     if (block.type === 'divider') {
       return (
         <div key={block._id} className="relative group my-6">
-          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity mb-2">
-            <button className="p-1 hover:bg-neutral-700 rounded">
-              <GripVertical className="w-4 h-4 text-gray-500" />
-            </button>
-          </div>
+          {canEdit && (
+            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity mb-2">
+              <button className="p-1 hover:bg-neutral-700 rounded">
+                <GripVertical className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+          )}
           <div className="border-t-2 border-neutral-700"></div>
-          <button
-            onClick={() => handleDeleteBlock(block._id)}
-            className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-900/30 rounded transition-opacity"
-          >
-            <Trash2 className="w-4 h-4 text-red-400" />
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => handleDeleteBlock(block._id)}
+              className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-900/30 rounded transition-opacity"
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+            </button>
+          )}
         </div>
       );
     }
 
     return (
       <div key={block._id} className="relative group flex items-start gap-2 py-1">
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button className="p-1 hover:bg-neutral-700 rounded cursor-grab active:cursor-grabbing">
-            <GripVertical className="w-4 h-4 text-gray-500" />
-          </button>
-          <button 
-            onClick={() => handleAddBlock(block._id)}
-            className="p-1 hover:bg-neutral-700 rounded"
-            title="Add block below"
-          >
-            <Plus className="w-4 h-4 text-gray-400" />
-          </button>
-        </div>
+        {canEdit && (
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button className="p-1 hover:bg-neutral-700 rounded cursor-grab active:cursor-grabbing">
+              <GripVertical className="w-4 h-4 text-gray-500" />
+            </button>
+            <button 
+              onClick={() => handleAddBlock(block._id)}
+              className="p-1 hover:bg-neutral-700 rounded"
+              title="Add block below"
+            >
+              <Plus className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+        )}
         
         <div className="flex-1 min-w-0">
           {block.type === 'bulletList' && (
@@ -315,15 +338,15 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
               <span className="text-gray-400 mt-1">•</span>
               <div
                 ref={el => blockRefs.current[block._id] = el}
-                contentEditable
+                contentEditable={canEdit}
                 suppressContentEditableWarning
                 onBlur={(e) => handleBlockContentChange(block._id, e.currentTarget.innerHTML)}
                 onKeyDown={(e) => handleKeyDown(e, block._id, index)}
                 onFocus={() => setFocusedBlockId(block._id)}
                 className={`flex-1 outline-none ${getBlockStyle(block.type)} ${
                   !block.content ? 'empty-placeholder' : ''
-                }`}
-                data-placeholder={getPlaceholder(block.type)}
+                } ${!canEdit ? 'cursor-default' : ''}`}
+                data-placeholder={canEdit ? getPlaceholder(block.type) : ''}
                 dangerouslySetInnerHTML={{ __html: block.content }}
               />
             </div>
@@ -333,33 +356,33 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
               <span className="text-gray-400 mt-1">{index + 1}.</span>
               <div
                 ref={el => blockRefs.current[block._id] = el}
-                contentEditable
+                contentEditable={canEdit}
                 suppressContentEditableWarning
                 onBlur={(e) => handleBlockContentChange(block._id, e.currentTarget.innerHTML)}
                 onKeyDown={(e) => handleKeyDown(e, block._id, index)}
                 onFocus={() => setFocusedBlockId(block._id)}
                 className={`flex-1 outline-none ${getBlockStyle(block.type)} ${
                   !block.content ? 'empty-placeholder' : ''
-                }`}
-                data-placeholder={getPlaceholder(block.type)}
+                } ${!canEdit ? 'cursor-default' : ''}`}
+                data-placeholder={canEdit ? getPlaceholder(block.type) : ''}
                 dangerouslySetInnerHTML={{ __html: block.content }}
               />
             </div>
           )}
           {block.type === 'todo' && (
             <div className="flex items-start gap-2">
-              <input type="checkbox" className="mt-1.5 w-4 h-4 rounded border-gray-600 bg-neutral-800" />
+              <input type="checkbox" className="mt-1.5 w-4 h-4 rounded border-gray-600 bg-neutral-800" disabled={!canEdit} />
               <div
                 ref={el => blockRefs.current[block._id] = el}
-                contentEditable
+                contentEditable={canEdit}
                 suppressContentEditableWarning
                 onBlur={(e) => handleBlockContentChange(block._id, e.currentTarget.innerHTML)}
                 onKeyDown={(e) => handleKeyDown(e, block._id, index)}
                 onFocus={() => setFocusedBlockId(block._id)}
                 className={`flex-1 outline-none ${getBlockStyle(block.type)} ${
                   !block.content ? 'empty-placeholder' : ''
-                }`}
-                data-placeholder={getPlaceholder(block.type)}
+                } ${!canEdit ? 'cursor-default' : ''}`}
+                data-placeholder={canEdit ? getPlaceholder(block.type) : ''}
                 dangerouslySetInnerHTML={{ __html: block.content }}
               />
             </div>
@@ -367,27 +390,29 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
           {!['bulletList', 'numberedList', 'todo'].includes(block.type) && (
             <div
               ref={el => blockRefs.current[block._id] = el}
-              contentEditable
+              contentEditable={canEdit}
               suppressContentEditableWarning
               onBlur={(e) => handleBlockContentChange(block._id, e.currentTarget.innerHTML)}
               onKeyDown={(e) => handleKeyDown(e, block._id, index)}
               onFocus={() => setFocusedBlockId(block._id)}
               className={`outline-none ${getBlockStyle(block.type)} ${
                 !block.content ? 'empty-placeholder' : ''
-              }`}
-              data-placeholder={getPlaceholder(block.type)}
+              } ${!canEdit ? 'cursor-default' : ''}`}
+              data-placeholder={canEdit ? getPlaceholder(block.type) : ''}
               dangerouslySetInnerHTML={{ __html: block.content }}
             />
           )}
         </div>
 
-        <button
-          onClick={() => handleDeleteBlock(block._id)}
-          className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-900/30 rounded transition-opacity"
-          title="Delete block"
-        >
-          <Trash2 className="w-4 h-4 text-red-400" />
-        </button>
+        {canEdit && (
+          <button
+            onClick={() => handleDeleteBlock(block._id)}
+            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-900/30 rounded transition-opacity"
+            title="Delete block"
+          >
+            <Trash2 className="w-4 h-4 text-red-400" />
+          </button>
+        )}
       </div>
     );
   };
@@ -423,31 +448,41 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
         <div className="flex items-center gap-3">
           <span className="text-2xl">{selectedEmoji}</span>
           <span className="text-sm text-gray-400">{pageTitle || 'Untitled'}</span>
-          <button className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:bg-neutral-800 rounded transition-colors">
-            <Lock className="w-3 h-3" />
-            Private
-            <ChevronDown className="w-3 h-3" />
-          </button>
+          {page.userRole && (
+            <span className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 bg-neutral-800 rounded">
+              <Lock className="w-3 h-3" />
+              {page.userRole.charAt(0).toUpperCase() + page.userRole.slice(1)}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button 
             onClick={handleSavePage}
-            disabled={saving}
-            className="px-4 py-1.5 text-sm bg-green-600 hover:bg-green-700 rounded text-white font-medium flex items-center gap-2 disabled:opacity-50 transition-colors"
+            disabled={saving || !canEdit}
+            className="px-4 py-1.5 text-sm bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white font-medium flex items-center gap-2 transition-colors"
           >
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : 'Save'}
           </button>
-          <button className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 rounded text-white transition-colors">
-            <Share2 className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={handleToggleFavorite}
-            className={`p-1.5 hover:bg-neutral-800 rounded transition-colors ${isFavorite ? 'text-yellow-400' : ''}`}
-            title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-          >
-            {isFavorite ? <Star className="w-4 h-4 fill-current" /> : <Star className="w-4 h-4" />}
-          </button>
+          {canManage && (
+            <button 
+              onClick={handleShare}
+              className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 rounded text-white flex items-center gap-2 transition-colors"
+              title="Share and manage collaborators"
+            >
+              <Users className="w-4 h-4" />
+              <span className="hidden sm:inline">Share</span>
+            </button>
+          )}
+          {isOwner && (
+            <button 
+              onClick={handleToggleFavorite}
+              className={`p-1.5 hover:bg-neutral-800 rounded transition-colors ${isFavorite ? 'text-yellow-400' : ''}`}
+              title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            >
+              {isFavorite ? <Star className="w-4 h-4 fill-current" /> : <Star className="w-4 h-4" />}
+            </button>
+          )}
           <div className="relative" ref={moreMenuRef}>
             <button 
               onClick={() => setShowMoreMenu(!showMoreMenu)}
@@ -465,6 +500,15 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
                   <Copy className="w-4 h-4" />
                   Duplicate
                 </button>
+                {canManage && (
+                  <button 
+                    onClick={handleShare}
+                    className="w-full px-3 py-2 text-sm text-left hover:bg-neutral-700 flex items-center gap-2 transition-colors"
+                  >
+                    <Users className="w-4 h-4" />
+                    Manage sharing
+                  </button>
+                )}
                 <button className="w-full px-3 py-2 text-sm text-left hover:bg-neutral-700 flex items-center gap-2 transition-colors">
                   <Share2 className="w-4 h-4" />
                   Copy link
@@ -473,49 +517,64 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
                   <Download className="w-4 h-4" />
                   Export
                 </button>
-                <div className="h-px bg-neutral-700 my-1" />
-                <button 
-                  onClick={handleToggleFavorite}
-                  className="w-full px-3 py-2 text-sm text-left hover:bg-neutral-700 flex items-center gap-2 transition-colors"
-                >
-                  {isFavorite ? (
-                    <>
-                      <StarOff className="w-4 h-4" />
-                      Remove from favorites
-                    </>
-                  ) : (
-                    <>
-                      <Star className="w-4 h-4" />
-                      Add to favorites
-                    </>
-                  )}
-                </button>
-                <div className="h-px bg-neutral-700 my-1" />
-                <button 
-                  onClick={handleDelete}
-                  className="w-full px-3 py-2 text-sm text-left hover:bg-neutral-700 flex items-center gap-2 text-red-400 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
-                </button>
+                {isOwner && (
+                  <>
+                    <div className="h-px bg-neutral-700 my-1" />
+                    <button 
+                      onClick={handleToggleFavorite}
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-neutral-700 flex items-center gap-2 transition-colors"
+                    >
+                      {isFavorite ? (
+                        <>
+                          <StarOff className="w-4 h-4" />
+                          Remove from favorites
+                        </>
+                      ) : (
+                        <>
+                          <Star className="w-4 h-4" />
+                          Add to favorites
+                        </>
+                      )}
+                    </button>
+                    <div className="h-px bg-neutral-700 my-1" />
+                    <button 
+                      onClick={handleDelete}
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-neutral-700 flex items-center gap-2 text-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
 
+      {/* View-only banner for viewers */}
+      {isViewer && (
+        <div className="bg-yellow-900/20 border-b border-yellow-700/30 px-6 py-2 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-yellow-400" />
+          <span className="text-sm text-yellow-200">
+            You have view-only access to this page
+          </span>
+        </div>
+      )}
+
       {/* Editor Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-16 py-20">
           <div className="mb-6 relative">
             <button 
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="text-8xl hover:opacity-80 transition-opacity"
+              onClick={() => canEdit && setShowEmojiPicker(!showEmojiPicker)}
+              className={`text-8xl ${canEdit ? 'hover:opacity-80 cursor-pointer' : 'cursor-default'} transition-opacity`}
+              disabled={!canEdit}
             >
               {selectedEmoji}
             </button>
             
-            {showEmojiPicker && (
+            {showEmojiPicker && canEdit && (
               <div className="absolute top-full left-0 mt-2 bg-neutral-800 border border-neutral-700 rounded-lg p-3 shadow-xl z-10">
                 <div className="grid grid-cols-10 gap-2">
                   {emojis.map((emoji, idx) => (
@@ -540,7 +599,8 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
             value={pageTitle}
             onChange={(e) => setPageTitle(e.target.value)}
             placeholder="Untitled"
-            className="w-full text-5xl font-bold bg-transparent border-none outline-none text-white placeholder-gray-600 mb-8"
+            className={`w-full text-5xl font-bold bg-transparent border-none outline-none text-white placeholder-gray-600 mb-8 ${!canEdit ? 'cursor-default' : ''}`}
+            disabled={!canEdit}
           />
 
           {/* Render Blocks */}
@@ -548,8 +608,8 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
             {blocks.map((block, index) => renderBlock(block, index))}
           </div>
 
-          {/* Command Menu */}
-          {showCommandMenu && (
+          {/* Command Menu - only show if can edit */}
+          {showCommandMenu && canEdit && (
             <div 
               className="command-menu-wrapper fixed bg-neutral-800 border border-neutral-700 rounded-lg shadow-2xl p-2 w-80 z-50"
               style={{ top: commandMenuPosition.top, left: commandMenuPosition.left }}
@@ -575,6 +635,13 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
         </div>
       </div>
 
+      {/* Share Modal */}
+      <ShareModal 
+        page={page} 
+        isOpen={showShareModal} 
+        onClose={() => setShowShareModal(false)} 
+      />
+
       {/* Style for placeholder */}
       <style>{`
         .empty-placeholder[contenteditable]:empty:before {
@@ -583,6 +650,9 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
         }
         [contenteditable]:focus {
           outline: none;
+        }
+        [contenteditable="false"] {
+          cursor: default;
         }
       `}</style>
     </div>

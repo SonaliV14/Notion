@@ -29,7 +29,7 @@ const Footer = () => {
 
         {/* Copyright */}
         <div className="text-gray-500 text-sm text-center">
-          © 2025 NoteHub • Made with <Heart className="w-4 h-4 inline mx-1 fill-current text-white" />
+          © 2025 NoteHub 
         </div>
       </div>
     </footer>

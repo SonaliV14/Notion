@@ -1,5 +1,34 @@
 import Page from "../models/Page.js";
 import Block from "../models/Block.js";
+import Collaborator from "../models/Collaborator.js";
+
+// Helper function to check if user has access to page
+const checkPageAccess = async (pageId, userId, requiredRole = null) => {
+  const page = await Page.findById(pageId);
+  if (!page) return { hasAccess: false, page: null, role: null };
+
+  // Check if user is owner
+  const isOwner = page.owner.toString() === userId.toString();
+  if (isOwner) return { hasAccess: true, page, role: 'owner' };
+
+  // Check if user is a collaborator
+  const collaboration = await Collaborator.findOne({
+    pageId,
+    userId,
+    status: 'accepted'
+  });
+
+  if (!collaboration) return { hasAccess: false, page, role: null };
+
+  // If specific role required, check it
+  if (requiredRole) {
+    const roleHierarchy = { viewer: 1, editor: 2, admin: 3 };
+    const hasRequiredRole = roleHierarchy[collaboration.role] >= roleHierarchy[requiredRole];
+    return { hasAccess: hasRequiredRole, page, role: collaboration.role };
+  }
+
+  return { hasAccess: true, page, role: collaboration.role };
+};
 
 // Create a new page with initial empty block
 export const createPage = async (req, res) => {
@@ -11,7 +40,6 @@ export const createPage = async (req, res) => {
       icon: icon || "👋",
       coverImage: coverImage || null,
       owner: req.user._id,
-      lastEditedBy: req.user._id,
       isDeleted: false
     });
 
@@ -28,9 +56,14 @@ export const createPage = async (req, res) => {
 
     await initialBlock.save();
 
+    // Return page with ownership flags
+    const pageObject = newPage.toObject();
+    pageObject.isOwner = true;
+    pageObject.userRole = 'owner';
+
     res.status(201).json({ 
       success: true, 
-      page: newPage,
+      page: pageObject,
       blocks: [initialBlock]
     });
   } catch (err) {
@@ -38,7 +71,7 @@ export const createPage = async (req, res) => {
   }
 };
 
-// Get all active (non-deleted) pages of logged-in user
+// Get all active (non-deleted) pages of logged-in user (owned only)
 export const getUserPages = async (req, res) => {
   try {
     const { favorite, search, sortBy = 'updatedAt', order = 'desc' } = req.query;
@@ -61,11 +94,20 @@ export const getUserPages = async (req, res) => {
     const sortOrder = order === 'asc' ? 1 : -1;
     const sortOptions = { [sortBy]: sortOrder };
 
-    const pages = await Page.find(query)
+    // Get owned pages
+    const ownedPages = await Page.find(query)
       .sort(sortOptions)
-      .select('-__v');
+      .select('-__v')
+      .lean();
+
+    // Add ownership info to each page
+    const pagesWithOwnership = ownedPages.map(page => ({
+      ...page,
+      userRole: 'owner',
+      isOwner: true
+    }));
     
-    res.status(200).json({ success: true, pages });
+    res.status(200).json({ success: true, pages: pagesWithOwnership });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -96,9 +138,17 @@ export const getFavoritePages = async (req, res) => {
       isFavorite: true
     })
     .sort({ updatedAt: -1 })
-    .select('-__v');
+    .select('-__v')
+    .lean();
+
+    // Add ownership info
+    const pagesWithOwnership = pages.map(page => ({
+      ...page,
+      userRole: 'owner',
+      isOwner: true
+    }));
     
-    res.status(200).json({ success: true, pages });
+    res.status(200).json({ success: true, pages: pagesWithOwnership });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -107,13 +157,10 @@ export const getFavoritePages = async (req, res) => {
 // Get a single page with all its blocks
 export const getPage = async (req, res) => {
   try {
-    const page = await Page.findById(req.params.id).select('-__v');
+    const { hasAccess, page, role } = await checkPageAccess(req.params.id, req.user._id);
 
-    if (!page) {
-      return res.status(404).json({ success: false, error: "Page not found" });
-    }
-    if (page.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, error: "Not authorized" });
+    if (!hasAccess || !page) {
+      return res.status(403).json({ success: false, error: "Not authorized to view this page" });
     }
 
     // Get all blocks for this page
@@ -124,9 +171,16 @@ export const getPage = async (req, res) => {
     .sort({ order: 1 })
     .select('-__v');
 
+    // Add role information
+    const pageWithRole = {
+      ...page.toObject(),
+      userRole: role,
+      isOwner: role === 'owner'
+    };
+
     res.status(200).json({ 
       success: true, 
-      page,
+      page: pageWithRole,
       blocks 
     });
   } catch (err) {
@@ -137,13 +191,11 @@ export const getPage = async (req, res) => {
 // Update page metadata (title, icon, cover, etc.)
 export const updatePage = async (req, res) => {
   try {
-    const page = await Page.findById(req.params.id);
+    // Check if user has editor or admin access
+    const { hasAccess, page, role } = await checkPageAccess(req.params.id, req.user._id, 'editor');
 
-    if (!page) {
-      return res.status(404).json({ success: false, error: "Page not found" });
-    }
-    if (page.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, error: "Not authorized" });
+    if (!hasAccess || !page) {
+      return res.status(403).json({ success: false, error: "Not authorized to edit this page" });
     }
 
     const { title, icon, coverImage, isFavorite, permissions } = req.body;
@@ -151,13 +203,24 @@ export const updatePage = async (req, res) => {
     if (title !== undefined) page.title = title;
     if (icon !== undefined) page.icon = icon;
     if (coverImage !== undefined) page.coverImage = coverImage;
-    if (isFavorite !== undefined) page.isFavorite = isFavorite;
-    if (permissions !== undefined) page.permissions = permissions;
+    
+    // Only owner can change favorite status and permissions
+    if (role === 'owner') {
+      if (isFavorite !== undefined) page.isFavorite = isFavorite;
+      if (permissions !== undefined) page.permissions = permissions;
+    }
     
     page.updatedAt = new Date();
-
     await page.save();
-    res.status(200).json({ success: true, page });
+
+    // Return page with role info
+    const pageWithRole = {
+      ...page.toObject(),
+      userRole: role,
+      isOwner: role === 'owner'
+    };
+
+    res.status(200).json({ success: true, page: pageWithRole });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -171,16 +234,24 @@ export const toggleFavorite = async (req, res) => {
     if (!page) {
       return res.status(404).json({ success: false, error: "Page not found" });
     }
+    
+    // Only owner can favorite/unfavorite
     if (page.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, error: "Not authorized" });
+      return res.status(403).json({ success: false, error: "Only owner can manage favorites" });
     }
 
     page.isFavorite = !page.isFavorite;
     await page.save();
 
+    const pageWithRole = {
+      ...page.toObject(),
+      userRole: 'owner',
+      isOwner: true
+    };
+
     res.status(200).json({ 
       success: true, 
-      page,
+      page: pageWithRole,
       message: page.isFavorite ? "Added to favorites" : "Removed from favorites"
     });
   } catch (err) {
@@ -191,20 +262,17 @@ export const toggleFavorite = async (req, res) => {
 // Duplicate a page with all its blocks
 export const duplicatePage = async (req, res) => {
   try {
-    const originalPage = await Page.findById(req.params.id);
+    const { hasAccess, page, role } = await checkPageAccess(req.params.id, req.user._id);
 
-    if (!originalPage) {
-      return res.status(404).json({ success: false, error: "Page not found" });
-    }
-    if (originalPage.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, error: "Not authorized" });
+    if (!hasAccess || !page) {
+      return res.status(403).json({ success: false, error: "Not authorized to duplicate this page" });
     }
 
-    // Create duplicate page
+    // Create duplicate page (always owned by the user duplicating)
     const duplicatePage = new Page({
-      title: `${originalPage.title} (Copy)`,
-      icon: originalPage.icon,
-      coverImage: originalPage.coverImage,
+      title: `${page.title} (Copy)`,
+      icon: page.icon,
+      coverImage: page.coverImage,
       owner: req.user._id,
       isDeleted: false
     });
@@ -213,7 +281,7 @@ export const duplicatePage = async (req, res) => {
 
     // Get all blocks from original page
     const originalBlocks = await Block.find({ 
-      pageId: originalPage._id, 
+      pageId: page._id, 
       isDeleted: false 
     }).sort({ order: 1 });
 
@@ -232,9 +300,15 @@ export const duplicatePage = async (req, res) => {
       await Block.insertMany(duplicateBlocks);
     }
 
+    const pageWithRole = {
+      ...duplicatePage.toObject(),
+      userRole: 'owner',
+      isOwner: true
+    };
+
     res.status(201).json({ 
       success: true, 
-      page: duplicatePage,
+      page: pageWithRole,
       message: "Page duplicated successfully"
     });
   } catch (err) {
@@ -250,8 +324,10 @@ export const deletePage = async (req, res) => {
     if (!page) {
       return res.status(404).json({ success: false, error: "Page not found" });
     }
+
+    // Only owner can delete
     if (page.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, error: "Not authorized" });
+      return res.status(403).json({ success: false, error: "Only page owner can delete" });
     }
 
     page.isDeleted = true;
@@ -281,6 +357,8 @@ export const restorePage = async (req, res) => {
     if (!page) {
       return res.status(404).json({ success: false, error: "Page not found" });
     }
+    
+    // Only owner can restore
     if (page.owner.toString() !== req.user._id.toString()) {
       return res.status(403).json({ success: false, error: "Not authorized" });
     }
@@ -295,10 +373,16 @@ export const restorePage = async (req, res) => {
       { isDeleted: false }
     );
 
+    const pageWithRole = {
+      ...page.toObject(),
+      userRole: 'owner',
+      isOwner: true
+    };
+
     res.status(200).json({ 
       success: true, 
       message: "Page restored", 
-      page 
+      page: pageWithRole
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -313,11 +397,16 @@ export const permanentDeletePage = async (req, res) => {
     if (!page) {
       return res.status(404).json({ success: false, error: "Page not found" });
     }
+    
+    // Only owner can permanently delete
     if (page.owner.toString() !== req.user._id.toString()) {
       return res.status(403).json({ success: false, error: "Not authorized" });
     }
 
-    // Delete all blocks first
+    // Delete all collaborations
+    await Collaborator.deleteMany({ pageId: page._id });
+
+    // Delete all blocks
     await Block.deleteMany({ pageId: page._id });
 
     // Delete the page

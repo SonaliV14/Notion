@@ -7,6 +7,7 @@ import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
 import ContactUs from './pages/ContactUs.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import InviteAcceptPage from './pages/InviteAcceptPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 function AppRoutes() {
@@ -26,6 +27,18 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
       <Route path="/signup" element={user ? <Navigate to="/dashboard" /> : <Signup />} />
       <Route path="/contact-us" element={<ContactUs />} />
+      
+      {/* Invite Accept Route - Protected */}
+      <Route
+        path="/invite/:token"
+        element={
+          <ProtectedRoute>
+            <InviteAcceptPage />
+          </ProtectedRoute>
+        }
+      />
+      
+      {/* Dashboard Route */}
       <Route
         path="/dashboard"
         element={

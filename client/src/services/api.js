@@ -273,6 +273,132 @@ export const permanentDeleteBlock = async (blockId, token) => {
   }
 };
 
+// ==================== COLLABORATION APIs ====================
+
+// Invite a collaborator to a page
+export const inviteCollaborator = async (pageId, email, role, token) => {
+  try {
+    const res = await fetch(`${API_URL}/collaborators/pages/${pageId}/collaborators`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ email, role })
+    });
+    return await res.json();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// Get all collaborators for a page
+export const getPageCollaborators = async (pageId, token) => {
+  try {
+    const res = await fetch(`${API_URL}/collaborators/pages/${pageId}/collaborators`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return await res.json();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// Get all pages where user is a collaborator
+export const getCollaboratedPages = async (token) => {
+  try {
+    const res = await fetch(`${API_URL}/collaborators/collaborated-pages`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return await res.json();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// Get pending invitations for current user
+export const getPendingInvites = async (token) => {
+  try {
+    const res = await fetch(`${API_URL}/collaborators/invites/pending`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return await res.json();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// Accept collaboration invite
+export const acceptInvite = async (inviteToken, token) => {
+  try {
+    const res = await fetch(`${API_URL}/collaborators/invites/${inviteToken}/accept`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return await res.json();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// Reject collaboration invite
+export const rejectInvite = async (inviteToken, token) => {
+  try {
+    const res = await fetch(`${API_URL}/collaborators/invites/${inviteToken}/reject`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return await res.json();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// Update collaborator role
+export const updateCollaboratorRole = async (collaboratorId, role, token) => {
+  try {
+    const res = await fetch(`${API_URL}/collaborators/collaborators/${collaboratorId}/role`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ role })
+    });
+    return await res.json();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// Remove collaborator
+export const removeCollaborator = async (collaboratorId, token) => {
+  try {
+    const res = await fetch(`${API_URL}/collaborators/collaborators/${collaboratorId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return await res.json();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
 // ==================== HELPER FUNCTIONS ====================
 
 // Export API_URL for direct use if needed
