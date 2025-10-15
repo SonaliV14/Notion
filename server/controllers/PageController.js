@@ -1,113 +1,73 @@
 import Page from "../models/Page.js";
-import Block from "../models/Block.js";
-import Collaborator from "../models/Collaborator.js";
+import User from "../models/User.js";
+import { v4 as uuidv4 } from 'uuid';
 
-// Helper function to check if user has access to page
-const checkPageAccess = async (pageId, userId, requiredRole = null) => {
-  const page = await Page.findById(pageId);
-  if (!page) return { hasAccess: false, page: null, role: null };
-
-  // Check if user is owner
-  const isOwner = page.owner.toString() === userId.toString();
-  if (isOwner) return { hasAccess: true, page, role: 'owner' };
-
-  // Check if user is a collaborator
-  const collaboration = await Collaborator.findOne({
-    pageId,
-    userId,
-    status: 'accepted'
-  });
-
-  if (!collaboration) return { hasAccess: false, page, role: null };
-
-  // If specific role required, check it
-  if (requiredRole) {
-    const roleHierarchy = { viewer: 1, editor: 2, admin: 3 };
-    const hasRequiredRole = roleHierarchy[collaboration.role] >= roleHierarchy[requiredRole];
-    return { hasAccess: hasRequiredRole, page, role: collaboration.role };
-  }
-
-  return { hasAccess: true, page, role: collaboration.role };
-};
-
-// Create a new page with initial empty block
+// Create a new page
 export const createPage = async (req, res) => {
   try {
-    const { title, icon, coverImage } = req.body;
+    const { title, content } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ success: false, error: "Title is required" });
+    }
 
     const newPage = new Page({
-      title: title || "Untitled",
-      icon: icon || "👋",
-      coverImage: coverImage || null,
+      title,
+      content: content || "",
       owner: req.user._id,
       isDeleted: false
     });
 
     await newPage.save();
-
-    // Create initial empty paragraph block
-    const initialBlock = new Block({
-      pageId: newPage._id,
-      type: 'paragraph',
-      content: "",
-      order: 0,
-      isDeleted: false
-    });
-
-    await initialBlock.save();
-
-    // Return page with ownership flags
-    const pageObject = newPage.toObject();
-    pageObject.isOwner = true;
-    pageObject.userRole = 'owner';
-
-    res.status(201).json({ 
-      success: true, 
-      page: pageObject,
-      blocks: [initialBlock]
-    });
+    res.status(201).json({ success: true, page: newPage });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 };
 
-// Get all active (non-deleted) pages of logged-in user (owned only)
+// Get all active (non-deleted) pages of logged-in user
 export const getUserPages = async (req, res) => {
   try {
-    const { favorite, search, sortBy = 'updatedAt', order = 'desc' } = req.query;
-
-    const query = { 
+    const pages = await Page.find({ 
       owner: req.user._id,
       isDeleted: false 
-    };
-
-    // Filter by favorites
-    if (favorite === 'true') {
-      query.isFavorite = true;
-    }
-
-    // Search by title
-    if (search) {
-      query.title = { $regex: search, $options: 'i' };
-    }
-
-    const sortOrder = order === 'asc' ? 1 : -1;
-    const sortOptions = { [sortBy]: sortOrder };
-
-    // Get owned pages
-    const ownedPages = await Page.find(query)
-      .sort(sortOptions)
-      .select('-__v')
-      .lean();
-
-    // Add ownership info to each page
-    const pagesWithOwnership = ownedPages.map(page => ({
-      ...page,
-      userRole: 'owner',
-      isOwner: true
-    }));
+    }).sort({ updatedAt: -1 });
     
-    res.status(200).json({ success: true, pages: pagesWithOwnership });
+    res.status(200).json({ success: true, pages });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// Get all pages shared with the user
+export const getSharedPages = async (req, res) => {
+  try {
+    const pages = await Page.find({
+      'sharedWith.user': req.user._id,
+      isDeleted: false
+    })
+    .populate('owner', 'firstname lastname email')
+    .sort({ updatedAt: -1 });
+    
+    res.status(200).json({ success: true, pages });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// Get favorite pages
+export const getFavoritePages = async (req, res) => {
+  try {
+    const pages = await Page.find({
+      $or: [
+        { owner: req.user._id },
+        { 'sharedWith.user': req.user._id }
+      ],
+      isFavorite: true,
+      isDeleted: false
+    }).sort({ updatedAt: -1 });
+    
+    res.status(200).json({ success: true, pages });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -119,9 +79,7 @@ export const getTrashPages = async (req, res) => {
     const pages = await Page.find({ 
       owner: req.user._id,
       isDeleted: true 
-    })
-    .sort({ deletedAt: -1 })
-    .select('-__v');
+    }).sort({ deletedAt: -1 });
     
     res.status(200).json({ success: true, pages });
   } catch (err) {
@@ -129,188 +87,272 @@ export const getTrashPages = async (req, res) => {
   }
 };
 
-// Get all favorite pages
-export const getFavoritePages = async (req, res) => {
+// Search pages
+export const searchPages = async (req, res) => {
   try {
-    const pages = await Page.find({ 
-      owner: req.user._id,
-      isDeleted: false,
-      isFavorite: true
-    })
-    .sort({ updatedAt: -1 })
-    .select('-__v')
-    .lean();
-
-    // Add ownership info
-    const pagesWithOwnership = pages.map(page => ({
-      ...page,
-      userRole: 'owner',
-      isOwner: true
-    }));
+    const { query } = req.query;
     
-    res.status(200).json({ success: true, pages: pagesWithOwnership });
+    if (!query) {
+      return res.status(400).json({ success: false, error: "Search query is required" });
+    }
+
+    const pages = await Page.find({
+      $or: [
+        { owner: req.user._id },
+        { 'sharedWith.user': req.user._id }
+      ],
+      isDeleted: false,
+      $or: [
+        { title: { $regex: query, $options: 'i' } },
+        { content: { $regex: query, $options: 'i' } }
+      ]
+    })
+    .populate('owner', 'firstname lastname email')
+    .sort({ updatedAt: -1 });
+    
+    res.status(200).json({ success: true, pages });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 };
 
-// Get a single page with all its blocks
+// Get a single page
 export const getPage = async (req, res) => {
   try {
-    const { hasAccess, page, role } = await checkPageAccess(req.params.id, req.user._id);
+    const page = await Page.findById(req.params.id)
+      .populate('owner', 'firstname lastname email')
+      .populate('sharedWith.user', 'firstname lastname email');
 
-    if (!hasAccess || !page) {
-      return res.status(403).json({ success: false, error: "Not authorized to view this page" });
+    if (!page) return res.status(404).json({ success: false, error: "Page not found" });
+    
+    // Check if user has access
+    const isOwner = page.owner._id.toString() === req.user._id.toString();
+    const isSharedWith = page.sharedWith.some(s => s.user._id.toString() === req.user._id.toString());
+    
+    if (!isOwner && !isSharedWith) {
+      return res.status(403).json({ success: false, error: "Not authorized" });
     }
 
-    // Get all blocks for this page
-    const blocks = await Block.find({ 
-      pageId: page._id, 
-      isDeleted: false 
-    })
-    .sort({ order: 1 })
-    .select('-__v');
-
-    // Add role information
-    const pageWithRole = {
-      ...page.toObject(),
-      userRole: role,
-      isOwner: role === 'owner'
-    };
-
-    res.status(200).json({ 
-      success: true, 
-      page: pageWithRole,
-      blocks 
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-};
-
-// Update page metadata (title, icon, cover, etc.)
-export const updatePage = async (req, res) => {
-  try {
-    // Check if user has editor or admin access
-    const { hasAccess, page, role } = await checkPageAccess(req.params.id, req.user._id, 'editor');
-
-    if (!hasAccess || !page) {
-      return res.status(403).json({ success: false, error: "Not authorized to edit this page" });
-    }
-
-    const { title, icon, coverImage, isFavorite, permissions } = req.body;
-    
-    if (title !== undefined) page.title = title;
-    if (icon !== undefined) page.icon = icon;
-    if (coverImage !== undefined) page.coverImage = coverImage;
-    
-    // Only owner can change favorite status and permissions
-    if (role === 'owner') {
-      if (isFavorite !== undefined) page.isFavorite = isFavorite;
-      if (permissions !== undefined) page.permissions = permissions;
-    }
-    
-    page.updatedAt = new Date();
+    // Track last viewed
+    page.lastViewedBy = page.lastViewedBy.filter(
+      v => v.user.toString() !== req.user._id.toString()
+    );
+    page.lastViewedBy.push({ user: req.user._id, viewedAt: new Date() });
     await page.save();
 
-    // Return page with role info
-    const pageWithRole = {
-      ...page.toObject(),
-      userRole: role,
-      isOwner: role === 'owner'
-    };
-
-    res.status(200).json({ success: true, page: pageWithRole });
+    res.status(200).json({ success: true, page });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 };
 
-// Toggle favorite status
+// Update a page
+export const updatePage = async (req, res) => {
+  try {
+    const page = await Page.findById(req.params.id);
+
+    if (!page) return res.status(404).json({ success: false, error: "Page not found" });
+    
+    // Check if user has edit permission
+    const isOwner = page.owner.toString() === req.user._id.toString();
+    const sharedUser = page.sharedWith.find(s => s.user.toString() === req.user._id.toString());
+    const hasEditPermission = sharedUser && sharedUser.permission === 'edit';
+    
+    if (!isOwner && !hasEditPermission) {
+      return res.status(403).json({ success: false, error: "Not authorized to edit" });
+    }
+
+    const { title, content } = req.body;
+    if (title) page.title = title;
+    if (content !== undefined) page.content = content;
+
+    await page.save();
+    res.status(200).json({ success: true, page });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// Toggle favorite
 export const toggleFavorite = async (req, res) => {
   try {
     const page = await Page.findById(req.params.id);
 
-    if (!page) {
-      return res.status(404).json({ success: false, error: "Page not found" });
-    }
+    if (!page) return res.status(404).json({ success: false, error: "Page not found" });
     
-    // Only owner can favorite/unfavorite
-    if (page.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, error: "Only owner can manage favorites" });
+    const isOwner = page.owner.toString() === req.user._id.toString();
+    const isSharedWith = page.sharedWith.some(s => s.user.toString() === req.user._id.toString());
+    
+    if (!isOwner && !isSharedWith) {
+      return res.status(403).json({ success: false, error: "Not authorized" });
     }
 
     page.isFavorite = !page.isFavorite;
     await page.save();
 
-    const pageWithRole = {
-      ...page.toObject(),
-      userRole: 'owner',
-      isOwner: true
-    };
+    res.status(200).json({ success: true, page });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// Duplicate a page
+export const duplicatePage = async (req, res) => {
+  try {
+    const originalPage = await Page.findById(req.params.id);
+
+    if (!originalPage) return res.status(404).json({ success: false, error: "Page not found" });
+    
+    const isOwner = originalPage.owner.toString() === req.user._id.toString();
+    const isSharedWith = originalPage.sharedWith.some(s => s.user.toString() === req.user._id.toString());
+    
+    if (!isOwner && !isSharedWith) {
+      return res.status(403).json({ success: false, error: "Not authorized" });
+    }
+
+    const duplicatedPage = new Page({
+      title: `${originalPage.title} (Copy)`,
+      content: originalPage.content,
+      owner: req.user._id,
+      isDeleted: false
+    });
+
+    await duplicatedPage.save();
+    res.status(201).json({ success: true, page: duplicatedPage });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// Share page with users
+export const sharePage = async (req, res) => {
+  try {
+    const { emails, permission } = req.body;
+    const page = await Page.findById(req.params.id);
+
+    if (!page) return res.status(404).json({ success: false, error: "Page not found" });
+    
+    if (page.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, error: "Only owner can share" });
+    }
+
+    if (!emails || !Array.isArray(emails) || emails.length === 0) {
+      return res.status(400).json({ success: false, error: "Email addresses required" });
+    }
+
+    const users = await User.find({ email: { $in: emails } });
+    
+    if (users.length === 0) {
+      return res.status(404).json({ success: false, error: "No users found with provided emails" });
+    }
+
+    users.forEach(user => {
+      const alreadyShared = page.sharedWith.some(
+        s => s.user.toString() === user._id.toString()
+      );
+      
+      if (!alreadyShared && user._id.toString() !== page.owner.toString()) {
+        page.sharedWith.push({
+          user: user._id,
+          permission: permission || 'view',
+          sharedAt: new Date()
+        });
+      }
+    });
+
+    await page.save();
+    await page.populate('sharedWith.user', 'firstname lastname email');
 
     res.status(200).json({ 
       success: true, 
-      page: pageWithRole,
-      message: page.isFavorite ? "Added to favorites" : "Removed from favorites"
+      page,
+      message: `Page shared with ${users.length} user(s)` 
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 };
 
-// Duplicate a page with all its blocks
-export const duplicatePage = async (req, res) => {
+// Remove user from shared page
+export const removeSharedUser = async (req, res) => {
   try {
-    const { hasAccess, page, role } = await checkPageAccess(req.params.id, req.user._id);
+    const { userId } = req.params;
+    const page = await Page.findById(req.params.id);
 
-    if (!hasAccess || !page) {
-      return res.status(403).json({ success: false, error: "Not authorized to duplicate this page" });
+    if (!page) return res.status(404).json({ success: false, error: "Page not found" });
+    
+    if (page.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, error: "Only owner can remove users" });
     }
 
-    // Create duplicate page (always owned by the user duplicating)
-    const duplicatePage = new Page({
-      title: `${page.title} (Copy)`,
-      icon: page.icon,
-      coverImage: page.coverImage,
-      owner: req.user._id,
-      isDeleted: false
-    });
+    page.sharedWith = page.sharedWith.filter(
+      s => s.user.toString() !== userId
+    );
 
-    await duplicatePage.save();
+    await page.save();
+    res.status(200).json({ success: true, page });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
 
-    // Get all blocks from original page
-    const originalBlocks = await Block.find({ 
-      pageId: page._id, 
-      isDeleted: false 
-    }).sort({ order: 1 });
+// Generate public share link
+export const generateShareLink = async (req, res) => {
+  try {
+    const page = await Page.findById(req.params.id);
 
-    // Create duplicate blocks
-    const duplicateBlocks = originalBlocks.map(block => ({
-      pageId: duplicatePage._id,
-      type: block.type,
-      content: block.content,
-      properties: block.properties,
-      order: block.order,
-      parentBlockId: block.parentBlockId,
-      isDeleted: false
-    }));
-
-    if (duplicateBlocks.length > 0) {
-      await Block.insertMany(duplicateBlocks);
+    if (!page) return res.status(404).json({ success: false, error: "Page not found" });
+    
+    if (page.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, error: "Only owner can generate share link" });
     }
 
-    const pageWithRole = {
-      ...duplicatePage.toObject(),
-      userRole: 'owner',
-      isOwner: true
-    };
+    if (!page.publicShareLink) {
+      page.publicShareLink = uuidv4();
+      page.isPublic = true;
+      await page.save();
+    }
 
-    res.status(201).json({ 
-      success: true, 
-      page: pageWithRole,
-      message: "Page duplicated successfully"
-    });
+    const shareUrl = `${req.protocol}://${req.get('host')}/shared/${page.publicShareLink}`;
+    res.status(200).json({ success: true, shareUrl, shareLink: page.publicShareLink });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// Disable public share link
+export const disableShareLink = async (req, res) => {
+  try {
+    const page = await Page.findById(req.params.id);
+
+    if (!page) return res.status(404).json({ success: false, error: "Page not found" });
+    
+    if (page.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, error: "Only owner can disable share link" });
+    }
+
+    page.isPublic = false;
+    page.publicShareLink = null;
+    await page.save();
+
+    res.status(200).json({ success: true, message: "Share link disabled" });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// Get page by public share link
+export const getPageByShareLink = async (req, res) => {
+  try {
+    const { shareLink } = req.params;
+    const page = await Page.findOne({ publicShareLink: shareLink, isPublic: true })
+      .populate('owner', 'firstname lastname email');
+
+    if (!page) {
+      return res.status(404).json({ success: false, error: "Page not found or link is invalid" });
+    }
+
+    res.status(200).json({ success: true, page });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -321,29 +363,15 @@ export const deletePage = async (req, res) => {
   try {
     const page = await Page.findById(req.params.id);
 
-    if (!page) {
-      return res.status(404).json({ success: false, error: "Page not found" });
-    }
-
-    // Only owner can delete
-    if (page.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ success: false, error: "Only page owner can delete" });
-    }
+    if (!page) return res.status(404).json({ success: false, error: "Page not found" });
+    if (page.owner.toString() !== req.user._id.toString())
+      return res.status(403).json({ success: false, error: "Not authorized" });
 
     page.isDeleted = true;
     page.deletedAt = new Date();
     await page.save();
 
-    // Soft delete all blocks of this page
-    await Block.updateMany(
-      { pageId: page._id },
-      { isDeleted: true }
-    );
-
-    res.status(200).json({ 
-      success: true, 
-      message: "Page moved to trash" 
-    });
+    res.status(200).json({ success: true, message: "Page moved to trash" });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -354,68 +382,31 @@ export const restorePage = async (req, res) => {
   try {
     const page = await Page.findById(req.params.id);
 
-    if (!page) {
-      return res.status(404).json({ success: false, error: "Page not found" });
-    }
-    
-    // Only owner can restore
-    if (page.owner.toString() !== req.user._id.toString()) {
+    if (!page) return res.status(404).json({ success: false, error: "Page not found" });
+    if (page.owner.toString() !== req.user._id.toString())
       return res.status(403).json({ success: false, error: "Not authorized" });
-    }
 
     page.isDeleted = false;
     page.deletedAt = null;
     await page.save();
 
-    // Restore all blocks of this page
-    await Block.updateMany(
-      { pageId: page._id },
-      { isDeleted: false }
-    );
-
-    const pageWithRole = {
-      ...page.toObject(),
-      userRole: 'owner',
-      isOwner: true
-    };
-
-    res.status(200).json({ 
-      success: true, 
-      message: "Page restored", 
-      page: pageWithRole
-    });
+    res.status(200).json({ success: true, message: "Page restored", page });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 };
 
-// Permanently delete a page and all its blocks
+// Permanently delete a page
 export const permanentDeletePage = async (req, res) => {
   try {
     const page = await Page.findById(req.params.id);
 
-    if (!page) {
-      return res.status(404).json({ success: false, error: "Page not found" });
-    }
-    
-    // Only owner can permanently delete
-    if (page.owner.toString() !== req.user._id.toString()) {
+    if (!page) return res.status(404).json({ success: false, error: "Page not found" });
+    if (page.owner.toString() !== req.user._id.toString())
       return res.status(403).json({ success: false, error: "Not authorized" });
-    }
 
-    // Delete all collaborations
-    await Collaborator.deleteMany({ pageId: page._id });
-
-    // Delete all blocks
-    await Block.deleteMany({ pageId: page._id });
-
-    // Delete the page
     await page.deleteOne();
-
-    res.status(200).json({ 
-      success: true, 
-      message: "Page permanently deleted" 
-    });
+    res.status(200).json({ success: true, message: "Page permanently deleted" });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
