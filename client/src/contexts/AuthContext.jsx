@@ -14,12 +14,14 @@ export const AuthProvider = ({ children }) => {
       : null;
   });
 
-  // ✅ ADD THIS: Set axios header on mount if token exists
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
     }
+    setLoading(false);
   }, []);
 
   const signup = async (formData) => {
@@ -78,7 +80,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, signup, login, logout }}>
+    <AuthContext.Provider value={{ user, signup, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

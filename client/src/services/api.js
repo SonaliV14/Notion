@@ -2,15 +2,58 @@ import axios from "axios";
 
 const BASE_URL = "http://localhost:5000/api";
 
-const api = axios.create({
+// Create separate axios instances for different purposes
+
+// 1. Public API instance (for auth routes - no token needed)
+const publicApi = axios.create({
   baseURL: BASE_URL,
 });
 
-// -------------------- AUTH APIs --------------------
+// 2. Protected API instance (for routes that need token)
+const protectedApi = axios.create({
+  baseURL: BASE_URL,
+});
+
+// Request interceptor for protected routes only
+protectedApi.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for protected routes only
+protectedApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Clear invalid token and redirect to login
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+// -------------------- AUTH APIs (use publicApi) --------------------
 
 export const signup = async (formData) => {
   try {
-    const { data } = await api.post("/auth/signup", formData);
+    const { data } = await publicApi.post("/auth/signup", formData);
+    
+    // If signup successful, store token for future requests
+    if (data.success && data.token) {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+    }
+    
     return data;
   } catch (err) {
     return {
@@ -22,7 +65,14 @@ export const signup = async (formData) => {
 
 export const login = async (formData) => {
   try {
-    const { data } = await api.post("/auth/login", formData);
+    const { data } = await publicApi.post("/auth/login", formData);
+    
+    // If login successful, store token for future requests
+    if (data.success && data.token) {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+    }
+    
     return data;
   } catch (err) {
     return {
@@ -32,13 +82,11 @@ export const login = async (formData) => {
   }
 };
 
-// -------------------- PAGE APIs --------------------
+// -------------------- PAGE APIs (use protectedApi) --------------------
 
-export const getUserPages = async (token) => {
+export const getUserPages = async () => {
   try {
-    const { data } = await api.get("/pages", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.get("/pages");
     return data;
   } catch (err) {
     return {
@@ -48,11 +96,9 @@ export const getUserPages = async (token) => {
   }
 };
 
-export const getSharedPages = async (token) => {
+export const getSharedPages = async () => {
   try {
-    const { data } = await api.get("/pages/shared", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.get("/pages/shared");
     return data;
   } catch (err) {
     return {
@@ -62,11 +108,9 @@ export const getSharedPages = async (token) => {
   }
 };
 
-export const getFavoritePages = async (token) => {
+export const getFavoritePages = async () => {
   try {
-    const { data } = await api.get("/pages/favorites", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.get("/pages/favorites");
     return data;
   } catch (err) {
     return {
@@ -76,11 +120,9 @@ export const getFavoritePages = async (token) => {
   }
 };
 
-export const getTrashPages = async (token) => {
+export const getTrashPages = async () => {
   try {
-    const { data } = await api.get("/pages/trash", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.get("/pages/trash");
     return data;
   } catch (err) {
     return {
@@ -90,11 +132,9 @@ export const getTrashPages = async (token) => {
   }
 };
 
-export const searchPages = async (query, token) => {
+export const searchPages = async (query) => {
   try {
-    const { data } = await api.get(`/pages/search?query=${encodeURIComponent(query)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.get(`/pages/search?query=${encodeURIComponent(query)}`);
     return data;
   } catch (err) {
     return {
@@ -104,11 +144,9 @@ export const searchPages = async (query, token) => {
   }
 };
 
-export const createPage = async (pageData, token) => {
+export const createPage = async (pageData) => {
   try {
-    const { data } = await api.post("/pages", pageData, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.post("/pages", pageData);
     return data;
   } catch (err) {
     return {
@@ -118,11 +156,9 @@ export const createPage = async (pageData, token) => {
   }
 };
 
-export const getPage = async (pageId, token) => {
+export const getPage = async (pageId) => {
   try {
-    const { data } = await api.get(`/pages/${pageId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.get(`/pages/${pageId}`);
     return data;
   } catch (err) {
     return {
@@ -132,11 +168,9 @@ export const getPage = async (pageId, token) => {
   }
 };
 
-export const updatePage = async (pageId, pageData, token) => {
+export const updatePage = async (pageId, pageData) => {
   try {
-    const { data } = await api.put(`/pages/${pageId}`, pageData, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.put(`/pages/${pageId}`, pageData);
     return data;
   } catch (err) {
     return {
@@ -146,11 +180,9 @@ export const updatePage = async (pageId, pageData, token) => {
   }
 };
 
-export const toggleFavorite = async (pageId, token) => {
+export const toggleFavorite = async (pageId) => {
   try {
-    const { data } = await api.patch(`/pages/${pageId}/favorite`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.patch(`/pages/${pageId}/favorite`, {});
     return data;
   } catch (err) {
     return {
@@ -160,11 +192,9 @@ export const toggleFavorite = async (pageId, token) => {
   }
 };
 
-export const duplicatePage = async (pageId, token) => {
+export const duplicatePage = async (pageId) => {
   try {
-    const { data } = await api.post(`/pages/${pageId}/duplicate`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.post(`/pages/${pageId}/duplicate`, {});
     return data;
   } catch (err) {
     return {
@@ -174,13 +204,11 @@ export const duplicatePage = async (pageId, token) => {
   }
 };
 
-export const sharePage = async (pageId, emails, permission, token) => {
+export const sharePage = async (pageId, emails, permission) => {
   try {
-    const { data } = await api.post(`/pages/${pageId}/share`, 
-      { emails, permission }, 
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
+    const { data } = await protectedApi.post(
+      `/pages/${pageId}/share`, 
+      { emails, permission }
     );
     return data;
   } catch (err) {
@@ -191,11 +219,9 @@ export const sharePage = async (pageId, emails, permission, token) => {
   }
 };
 
-export const removeSharedUser = async (pageId, userId, token) => {
+export const removeSharedUser = async (pageId, userId) => {
   try {
-    const { data } = await api.delete(`/pages/${pageId}/share/${userId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.delete(`/pages/${pageId}/share/${userId}`);
     return data;
   } catch (err) {
     return {
@@ -205,11 +231,9 @@ export const removeSharedUser = async (pageId, userId, token) => {
   }
 };
 
-export const generateShareLink = async (pageId, token) => {
+export const generateShareLink = async (pageId) => {
   try {
-    const { data } = await api.post(`/pages/${pageId}/share-link`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.post(`/pages/${pageId}/share-link`, {});
     return data;
   } catch (err) {
     return {
@@ -219,11 +243,9 @@ export const generateShareLink = async (pageId, token) => {
   }
 };
 
-export const disableShareLink = async (pageId, token) => {
+export const disableShareLink = async (pageId) => {
   try {
-    const { data } = await api.delete(`/pages/${pageId}/share-link`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.delete(`/pages/${pageId}/share-link`);
     return data;
   } catch (err) {
     return {
@@ -233,11 +255,9 @@ export const disableShareLink = async (pageId, token) => {
   }
 };
 
-export const deletePage = async (pageId, token) => {
+export const deletePage = async (pageId) => {
   try {
-    const { data } = await api.delete(`/pages/${pageId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.delete(`/pages/${pageId}`);
     return data;
   } catch (err) {
     return {
@@ -247,11 +267,9 @@ export const deletePage = async (pageId, token) => {
   }
 };
 
-export const restorePage = async (pageId, token) => {
+export const restorePage = async (pageId) => {
   try {
-    const { data } = await api.patch(`/pages/${pageId}/restore`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.patch(`/pages/${pageId}/restore`, {});
     return data;
   } catch (err) {
     return {
@@ -261,11 +279,9 @@ export const restorePage = async (pageId, token) => {
   }
 };
 
-export const permanentDeletePage = async (pageId, token) => {
+export const permanentDeletePage = async (pageId) => {
   try {
-    const { data } = await api.delete(`/pages/${pageId}/permanent`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.delete(`/pages/${pageId}/permanent`);
     return data;
   } catch (err) {
     return {
@@ -275,13 +291,11 @@ export const permanentDeletePage = async (pageId, token) => {
   }
 };
 
-// -------------------- BLOCK APIs --------------------
+// -------------------- BLOCK APIs (use protectedApi) --------------------
 
-export const getPageBlocks = async (pageId, token) => {
+export const getPageBlocks = async (pageId) => {
   try {
-    const { data } = await api.get(`/blocks/page/${pageId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.get(`/blocks/page/${pageId}`);
     return data;
   } catch (err) {
     return {
@@ -291,11 +305,9 @@ export const getPageBlocks = async (pageId, token) => {
   }
 };
 
-export const createBlock = async (blockData, token) => {
+export const createBlock = async (blockData) => {
   try {
-    const { data } = await api.post("/blocks", blockData, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.post("/blocks", blockData);
     return data;
   } catch (err) {
     return {
@@ -305,11 +317,9 @@ export const createBlock = async (blockData, token) => {
   }
 };
 
-export const updateBlock = async (blockId, blockData, token) => {
+export const updateBlock = async (blockId, blockData) => {
   try {
-    const { data } = await api.put(`/blocks/${blockId}`, blockData, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.put(`/blocks/${blockId}`, blockData);
     return data;
   } catch (err) {
     return {
@@ -319,11 +329,9 @@ export const updateBlock = async (blockId, blockData, token) => {
   }
 };
 
-export const deleteBlock = async (blockId, token) => {
+export const deleteBlock = async (blockId) => {
   try {
-    const { data } = await api.delete(`/blocks/${blockId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const { data } = await protectedApi.delete(`/blocks/${blockId}`);
     return data;
   } catch (err) {
     return {
@@ -333,13 +341,11 @@ export const deleteBlock = async (blockId, token) => {
   }
 };
 
-export const reorderBlocks = async (pageId, blockOrders, token) => {
+export const reorderBlocks = async (pageId, blockOrders) => {
   try {
-    const { data } = await api.patch(`/blocks/reorder/${pageId}`, 
-      { blockOrders }, 
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
+    const { data } = await protectedApi.patch(
+      `/blocks/reorder/${pageId}`, 
+      { blockOrders }
     );
     return data;
   } catch (err) {
@@ -350,15 +356,67 @@ export const reorderBlocks = async (pageId, blockOrders, token) => {
   }
 };
 
-// -------------------- INVITE APIs --------------------
+// -------------------- COLLABORATOR APIs (use protectedApi) --------------------
 
-export const acceptInvite = async (inviteToken, userToken) => {
+export const inviteCollaborator = async (pageId, email, role) => {
   try {
-    const { data } = await api.post(
-      `/invites/accept/${inviteToken}`,
-      {},
-      { headers: { Authorization: `Bearer ${userToken}` } }
+    const { data } = await protectedApi.post(
+      `/collaborators/pages/${pageId}/collaborators`,
+      { email, role }
     );
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      error: err.response?.data?.error || "Failed to invite collaborator",
+    };
+  }
+};
+
+export const getPageCollaborators = async (pageId) => {
+  try {
+    const { data } = await protectedApi.get(`/collaborators/pages/${pageId}/collaborators`);
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      error: err.response?.data?.error || "Failed to fetch collaborators",
+    };
+  }
+};
+
+export const updateCollaboratorRole = async (collaboratorId, role) => {
+  try {
+    const { data } = await protectedApi.patch(
+      `/collaborators/collaborators/${collaboratorId}/role`,
+      { role }
+    );
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      error: err.response?.data?.error || "Failed to update role",
+    };
+  }
+};
+
+export const removeCollaborator = async (collaboratorId) => {
+  try {
+    const { data } = await protectedApi.delete(`/collaborators/collaborators/${collaboratorId}`);
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      error: err.response?.data?.error || "Failed to remove collaborator",
+    };
+  }
+};
+
+// -------------------- INVITE APIs (use protectedApi) --------------------
+
+export const acceptInvite = async (inviteToken) => {
+  try {
+    const { data } = await protectedApi.post(`/collaborators/invites/accept/${inviteToken}`, {});
     return data;
   } catch (err) {
     return {
@@ -368,13 +426,9 @@ export const acceptInvite = async (inviteToken, userToken) => {
   }
 };
 
-export const rejectInvite = async (inviteToken, userToken) => {
+export const rejectInvite = async (inviteToken) => {
   try {
-    const { data } = await api.post(
-      `/invites/reject/${inviteToken}`,
-      {},
-      { headers: { Authorization: `Bearer ${userToken}` } }
-    );
+    const { data } = await protectedApi.post(`/collaborators/invites/reject/${inviteToken}`, {});
     return data;
   } catch (err) {
     return {
@@ -383,3 +437,44 @@ export const rejectInvite = async (inviteToken, userToken) => {
     };
   }
 };
+
+// Get pending invitations for current user
+export const getPendingInvites = async () => {
+  try {
+    const { data } = await protectedApi.get(`/collaborators/invites/pending`);
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      error: err.response?.data?.error || "Failed to fetch pending invites",
+    };
+  }
+};
+
+// Get invite details by token
+export const getInviteDetails = async (inviteToken) => {
+  try {
+    const { data } = await protectedApi.get(`/collaborators/invites/details/${inviteToken}`);
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      error: err.response?.data?.error || "Failed to fetch invite details",
+    };
+  }
+};
+
+// Get collaborated pages
+export const getCollaboratedPages = async () => {
+  try {
+    const { data } = await protectedApi.get(`/collaborators/collaborated-pages`);
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      error: err.response?.data?.error || "Failed to fetch collaborated pages",
+    };
+  }
+};
+
+export default protectedApi;

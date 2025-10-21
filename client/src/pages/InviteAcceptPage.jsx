@@ -12,17 +12,17 @@ export default function InviteAcceptPage() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [inviteData, setInviteData] = useState(null);
 
   useEffect(() => {
     if (!user) {
-      // Store the invite token and redirect to login
       localStorage.setItem('pendingInviteToken', token);
       navigate('/login');
     }
   }, [user, navigate, token]);
 
   const handleAccept = async () => {
-    if (!user?.token) {
+    if (!user) {
       localStorage.setItem('pendingInviteToken', token);
       navigate('/login');
       return;
@@ -31,13 +31,19 @@ export default function InviteAcceptPage() {
     setLoading(true);
     setError(null);
     
-    const res = await acceptInvite(token, user.token);
+    const res = await acceptInvite(token);
     
     if (res.success) {
       setSuccess(true);
-      // Redirect to the page after 2 seconds
+      setInviteData({
+        pageTitle: res.page?.title || 'Untitled Page',
+        inviterName: res.collaborator?.invitedBy ? 
+          `${res.collaborator.invitedBy.firstname} ${res.collaborator.invitedBy.lastname}` : 
+          'Someone'
+      });
+      
       setTimeout(() => {
-        navigate(`/page/${res.page._id}`);
+        navigate(`/page/${res.page?._id || ''}`);
       }, 2000);
     } else {
       setError(res.error || 'Failed to accept invitation');
@@ -46,15 +52,14 @@ export default function InviteAcceptPage() {
   };
 
   const handleReject = async () => {
-    if (!user?.token) return;
+    if (!user) return;
 
     setRejecting(true);
     setError(null);
     
-    const res = await rejectInvite(token, user.token);
+    const res = await rejectInvite(token);
     
     if (res.success) {
-      // Redirect to home after 1.5 seconds
       setTimeout(() => {
         navigate('/');
       }, 1500);
@@ -86,7 +91,11 @@ export default function InviteAcceptPage() {
             Invitation Accepted!
           </h1>
           <p className="text-gray-400 mb-4">
-            Redirecting you to the page...
+            {inviteData ? (
+              <>You are now collaborating on "<strong>{inviteData.pageTitle}</strong>"</>
+            ) : (
+              'Redirecting you to the page...'
+            )}
           </p>
           <Loader className="w-6 h-6 text-blue-500 animate-spin mx-auto" />
         </div>
@@ -121,7 +130,7 @@ export default function InviteAcceptPage() {
             <Mail className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">
-            You've Been Invited!
+            Collaboration Invitation
           </h1>
           <p className="text-gray-400">
             You've been invited to collaborate on a page
@@ -149,8 +158,10 @@ export default function InviteAcceptPage() {
           <div className="flex items-center gap-3">
             <Users className="w-5 h-5 text-gray-400" />
             <div className="flex-1">
-              <p className="text-sm text-gray-400">What you can do</p>
-              <p className="text-white font-medium">View, edit, and collaborate</p>
+              <p className="text-sm text-gray-400">Invited by</p>
+              <p className="text-white font-medium">
+                {user.firstname} {user.lastname} (You)
+              </p>
             </div>
           </div>
         </div>

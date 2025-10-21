@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import Collaborator from "../models/Collaborator.js";
 import Page from "../models/Page.js";
 import User from "../models/User.js";
+import emailService from "../services/emailService.js";
 
 // Generate random invite token
 const generateInviteToken = () => {
@@ -19,7 +20,7 @@ export const inviteCollaborator = async (req, res) => {
     }
 
     // Validate role
-    if (!['viewer', 'editor', 'admin'].includes(role)) {
+    if (!['viewer', 'editor'].includes(role)) {
       return res.status(400).json({ success: false, error: "Invalid role" });
     }
 
@@ -29,17 +30,10 @@ export const inviteCollaborator = async (req, res) => {
       return res.status(404).json({ success: false, error: "Page not found" });
     }
 
-    // Check if user has permission to invite (must be owner or admin)
+    // Check if user has permission to invite (must be owner)
     const isOwner = page.owner.toString() === req.user._id.toString();
-    const isAdmin = await Collaborator.findOne({
-      pageId,
-      userId: req.user._id,
-      role: 'admin',
-      status: 'accepted'
-    });
-
-    if (!isOwner && !isAdmin) {
-      return res.status(403).json({ success: false, error: "Not authorized to invite collaborators" });
+    if (!isOwner) {
+      return res.status(403).json({ success: false, error: "Only page owner can invite collaborators" });
     }
 
     // Check if user is trying to invite themselves
@@ -80,18 +74,30 @@ export const inviteCollaborator = async (req, res) => {
 
     await collaborator.save();
 
-    // Populate the collaborator data
+    // Send email notification
+    try {
+      const emailResult = await emailService.sendCollaborationInvite({ 
+        recipientEmail: email,
+        recipientName: invitedUser ? `${invitedUser.firstname} ${invitedUser.lastname}` : null,
+        inviterName: `${req.user.firstname} ${req.user.lastname}`,
+        pageTitle: page.title,
+        role,
+        inviteToken,
+        pageId 
+      });
+
+      if (!emailResult.success) {
+        console.error('Failed to send email:', emailResult.error);
+        // Continue with the response but log the email error
+      }
+    } catch (emailError) {
+      console.error('Email service error:', emailError);
+      // Continue with the response even if email fails
+    }
+
+    // Populate the collaborator data for response
     await collaborator.populate('userId', 'firstname lastname email');
     await collaborator.populate('invitedBy', 'firstname lastname email');
-
-    // TODO: Send email notification here
-    // await emailService.sendCollaborationInvite({ 
-    //   recipientEmail: email,
-    //   inviterName: `${req.user.firstname} ${req.user.lastname}`,
-    //   pageTitle: page.title,
-    //   role,
-    //   inviteToken
-    // });
 
     res.status(201).json({ 
       success: true, 
@@ -212,6 +218,23 @@ export const acceptInvite = async (req, res) => {
     collaborator.userId = req.user._id;
     await collaborator.save();
 
+    // Add user to page's sharedWith array if not already present
+    const page = await Page.findById(collaborator.pageId._id);
+    if (page) {
+      const isAlreadyShared = page.sharedWith.some(
+        shared => shared.user.toString() === req.user._id.toString()
+      );
+      
+      if (!isAlreadyShared) {
+        page.sharedWith.push({
+          user: req.user._id,
+          permission: collaborator.role === 'viewer' ? 'view' : 'edit',
+          sharedAt: new Date()
+        });
+        await page.save();
+      }
+    }
+
     res.status(200).json({ 
       success: true, 
       collaborator,
@@ -229,7 +252,9 @@ export const rejectInvite = async (req, res) => {
   try {
     const { token } = req.params;
 
-    const collaborator = await Collaborator.findOne({ inviteToken: token });
+    const collaborator = await Collaborator.findOne({ inviteToken: token })
+      .populate('pageId')
+      .populate('invitedBy', 'firstname lastname email');
 
     if (!collaborator) {
       return res.status(404).json({ success: false, error: "Invalid invitation token" });
@@ -266,7 +291,7 @@ export const updateCollaboratorRole = async (req, res) => {
     const { collaboratorId } = req.params;
     const { role } = req.body;
 
-    if (!['viewer', 'editor', 'admin'].includes(role)) {
+    if (!['viewer', 'editor'].includes(role)) {
       return res.status(400).json({ success: false, error: "Invalid role" });
     }
 
@@ -281,21 +306,25 @@ export const updateCollaboratorRole = async (req, res) => {
       return res.status(404).json({ success: false, error: "Page not found" });
     }
 
-    // Only owner or admin can update roles
+    // Only owner can update roles
     const isOwner = page.owner.toString() === req.user._id.toString();
-    const isAdmin = await Collaborator.findOne({
-      pageId: collaborator.pageId,
-      userId: req.user._id,
-      role: 'admin',
-      status: 'accepted'
-    });
-
-    if (!isOwner && !isAdmin) {
-      return res.status(403).json({ success: false, error: "Not authorized to update roles" });
+    if (!isOwner) {
+      return res.status(403).json({ success: false, error: "Only page owner can update roles" });
     }
 
+    // Update collaborator role
     collaborator.role = role;
     await collaborator.save();
+
+    // Also update the permission in page's sharedWith array
+    const sharedUser = page.sharedWith.find(
+      shared => shared.user.toString() === collaborator.userId?.toString()
+    );
+    
+    if (sharedUser) {
+      sharedUser.permission = role === 'viewer' ? 'view' : 'edit';
+      await page.save();
+    }
 
     await collaborator.populate('userId', 'firstname lastname email');
 
@@ -326,18 +355,20 @@ export const removeCollaborator = async (req, res) => {
       return res.status(404).json({ success: false, error: "Page not found" });
     }
 
-    // Only owner or admin can remove collaborators (or users can remove themselves)
+    // Only owner can remove collaborators (or users can remove themselves)
     const isOwner = page.owner.toString() === req.user._id.toString();
-    const isAdmin = await Collaborator.findOne({
-      pageId: collaborator.pageId,
-      userId: req.user._id,
-      role: 'admin',
-      status: 'accepted'
-    });
     const isSelf = collaborator.userId?.toString() === req.user._id.toString();
 
-    if (!isOwner && !isAdmin && !isSelf) {
+    if (!isOwner && !isSelf) {
       return res.status(403).json({ success: false, error: "Not authorized to remove this collaborator" });
+    }
+
+    // Remove user from page's sharedWith array if they're accepted
+    if (collaborator.status === 'accepted' && collaborator.userId) {
+      page.sharedWith = page.sharedWith.filter(
+        shared => shared.user.toString() !== collaborator.userId.toString()
+      );
+      await page.save();
     }
 
     await collaborator.deleteOne();
@@ -367,6 +398,50 @@ export const getPendingInvites = async (req, res) => {
     res.status(200).json({ success: true, invites });
   } catch (err) {
     console.error('Get pending invites error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// Get invite details by token (for displaying invite information before accepting)
+export const getInviteDetails = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const collaborator = await Collaborator.findOne({ inviteToken: token })
+      .populate('pageId', 'title owner')
+      .populate('invitedBy', 'firstname lastname email')
+      .populate('owner', 'firstname lastname email');
+
+    if (!collaborator) {
+      return res.status(404).json({ success: false, error: "Invalid invitation token" });
+    }
+
+    if (collaborator.status !== 'pending') {
+      return res.status(400).json({ 
+        success: false, 
+        error: collaborator.status === 'accepted' 
+          ? "Invitation already accepted" 
+          : "Invitation was rejected" 
+      });
+    }
+
+    // Check if invitation has expired
+    if (new Date() > collaborator.inviteExpiresAt) {
+      return res.status(400).json({ success: false, error: "Invitation has expired" });
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      invite: {
+        pageTitle: collaborator.pageId.title,
+        inviterName: `${collaborator.invitedBy.firstname} ${collaborator.invitedBy.lastname}`,
+        inviterEmail: collaborator.invitedBy.email,
+        role: collaborator.role,
+        expiresAt: collaborator.inviteExpiresAt
+      }
+    });
+  } catch (err) {
+    console.error('Get invite details error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 };
