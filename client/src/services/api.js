@@ -464,7 +464,7 @@ export const getInviteDetails = async (inviteToken) => {
   }
 };
 
-// Get collaborated pages
+// Get collaborated pages with role information
 export const getCollaboratedPages = async () => {
   try {
     const { data } = await protectedApi.get(`/collaborators/collaborated-pages`);

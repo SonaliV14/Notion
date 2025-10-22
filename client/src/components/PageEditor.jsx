@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Type, Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare,
   Quote, Code, Minus, AlertCircle, ChevronRight, Save, MoreHorizontal,
   Star, Lock, Share2, Download, X, ChevronDown, Trash2, Plus,
-  GripVertical, Copy, StarOff, Users
+  GripVertical, Copy, StarOff, Users, ChevronLeft, FileText
 } from 'lucide-react';
 import { 
   updatePage, 
@@ -18,6 +19,7 @@ import { useAuth } from '../contexts/AuthContext';
 import ShareModal from './ShareModal';
 
 export default function PageEditor({ page, onDelete, onUpdate }) {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedEmoji, setSelectedEmoji] = useState('👋');
@@ -28,10 +30,12 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
   const [activeBlockId, setActiveBlockId] = useState(null);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [focusedBlockId, setFocusedBlockId] = useState(null);
   const moreMenuRef = useRef(null);
+  const exportMenuRef = useRef(null);
   const blockRefs = useRef({});
 
   const emojis = ['👋', '📝', '🚀', '💡', '📊', '🎯', '✨', '🔥', '💼', '📅', '🎨', '🌟', '📌', '🏆', '💪', '🎉', '🎭', '🌈', '⚡', '🎪'];
@@ -52,9 +56,6 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
   ];
 
   // Determine user permissions
-  // If userRole is undefined or null, user is the owner
-  // If isOwner is explicitly true, user is the owner
-  // If userRole is 'owner', user is the owner
   const isOwner = page?.isOwner === true || page?.userRole === 'owner' || page?.userRole === undefined || page?.userRole === null;
   const canEdit = isOwner || page?.userRole === 'editor' || page?.userRole === 'admin';
   const canManage = isOwner || page?.userRole === 'admin';
@@ -73,30 +74,247 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
   const loadBlocks = async () => {
     if (!page || !user?.token) return;
     
-    const res = await getPageBlocks(page._id, user.token);
-    if (res.success) {
-      setBlocks(res.blocks || []);
-      if (!res.blocks || res.blocks.length === 0) {
-        handleAddBlock(null);
+    try {
+      const res = await getPageBlocks(page._id, user.token);
+      if (res.success) {
+        setBlocks(res.blocks || []);
+        if (!res.blocks || res.blocks.length === 0) {
+          handleAddBlock(null);
+        }
       }
+    } catch (error) {
+      console.error('Failed to load blocks:', error);
     }
+  };
+
+  // Export functions
+  const exportToMarkdown = () => {
+    let markdown = `# ${pageTitle}\n\n`;
+    
+    blocks.forEach(block => {
+      switch (block.type) {
+        case 'heading1':
+          markdown += `# ${stripHtml(block.content)}\n\n`;
+          break;
+        case 'heading2':
+          markdown += `## ${stripHtml(block.content)}\n\n`;
+          break;
+        case 'heading3':
+          markdown += `### ${stripHtml(block.content)}\n\n`;
+          break;
+        case 'bulletList':
+          markdown += `- ${stripHtml(block.content)}\n`;
+          break;
+        case 'numberedList':
+          markdown += `1. ${stripHtml(block.content)}\n`;
+          break;
+        case 'todo':
+          markdown += `- [ ] ${stripHtml(block.content)}\n`;
+          break;
+        case 'quote':
+          markdown += `> ${stripHtml(block.content)}\n\n`;
+          break;
+        case 'code':
+          markdown += `\`\`\`\n${stripHtml(block.content)}\n\`\`\`\n\n`;
+          break;
+        case 'callout':
+          markdown += `> **Note:** ${stripHtml(block.content)}\n\n`;
+          break;
+        case 'divider':
+          markdown += `---\n\n`;
+          break;
+        default:
+          markdown += `${stripHtml(block.content)}\n\n`;
+      }
+    });
+
+    downloadFile(markdown, `${pageTitle}.md`, 'text/markdown');
+    setShowExportMenu(false);
+  };
+
+  const exportToText = () => {
+    let text = `${pageTitle}\n${'='.repeat(pageTitle.length)}\n\n`;
+    
+    blocks.forEach(block => {
+      text += `${stripHtml(block.content)}\n\n`;
+    });
+
+    downloadFile(text, `${pageTitle}.txt`, 'text/plain');
+    setShowExportMenu(false);
+  };
+
+  const exportToHTML = () => {
+    let html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${pageTitle}</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; }
+        h1 { font-size: 2.5em; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+        h2 { font-size: 2em; color: #667eea; }
+        h3 { font-size: 1.5em; color: #764ba2; }
+        blockquote { border-left: 4px solid #667eea; padding-left: 20px; margin-left: 0; font-style: italic; background: #f9f9f9; padding: 10px; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; font-family: 'Monaco', 'Menlo', monospace; }
+        pre { background: #2d3748; color: #e2e8f0; padding: 15px; border-radius: 6px; overflow-x: auto; }
+        .callout { background: #ebf8ff; border-left: 4px solid #4299e1; padding: 15px; margin: 10px 0; border-radius: 4px; }
+        ul, ol { padding-left: 20px; }
+        li { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>${pageTitle}</h1>
+`;
+
+    blocks.forEach(block => {
+      switch (block.type) {
+        case 'heading1':
+          html += `    <h1>${block.content}</h1>\n`;
+          break;
+        case 'heading2':
+          html += `    <h2>${block.content}</h2>\n`;
+          break;
+        case 'heading3':
+          html += `    <h3>${block.content}</h3>\n`;
+          break;
+        case 'bulletList':
+          html += `    <ul><li>${block.content}</li></ul>\n`;
+          break;
+        case 'numberedList':
+          html += `    <ol><li>${block.content}</li></ol>\n`;
+          break;
+        case 'todo':
+          html += `    <div style="display: flex; align-items: center; gap: 8px; margin: 5px 0;">
+        <input type="checkbox" disabled>
+        <span>${block.content}</span>
+    </div>\n`;
+          break;
+        case 'quote':
+          html += `    <blockquote>${block.content}</blockquote>\n`;
+          break;
+        case 'code':
+          html += `    <pre><code>${escapeHtml(stripHtml(block.content))}</code></pre>\n`;
+          break;
+        case 'callout':
+          html += `    <div class="callout">${block.content}</div>\n`;
+          break;
+        case 'divider':
+          html += `    <hr>\n`;
+          break;
+        default:
+          html += `    <p>${block.content}</p>\n`;
+      }
+    });
+
+    html += `</body>\n</html>`;
+    downloadFile(html, `${pageTitle}.html`, 'text/html');
+    setShowExportMenu(false);
+  };
+
+  const exportToPDF = () => {
+    // Simple PDF export using browser print functionality
+    const printContent = document.createElement('div');
+    printContent.innerHTML = `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #333; border-bottom: 2px solid #667eea; padding-bottom: 10px;">${pageTitle}</h1>
+        ${blocks.map(block => {
+          switch (block.type) {
+            case 'heading1':
+              return `<h1 style="color: #333;">${block.content}</h1>`;
+            case 'heading2':
+              return `<h2 style="color: #667eea;">${block.content}</h2>`;
+            case 'heading3':
+              return `<h3 style="color: #764ba2;">${block.content}</h3>`;
+            case 'bulletList':
+              return `<ul><li>${block.content}</li></ul>`;
+            case 'numberedList':
+              return `<ol><li>${block.content}</li></ol>`;
+            case 'todo':
+              return `<div style="display: flex; align-items: center; gap: 8px; margin: 5px 0;">
+                <input type="checkbox" disabled style="margin-right: 8px;">
+                <span>${block.content}</span>
+              </div>`;
+            case 'quote':
+              return `<blockquote style="border-left: 4px solid #667eea; padding-left: 20px; margin-left: 0; font-style: italic; background: #f9f9f9; padding: 10px;">${block.content}</blockquote>`;
+            case 'code':
+              return `<pre style="background: #f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto; font-family: monospace;">${escapeHtml(stripHtml(block.content))}</pre>`;
+            case 'callout':
+              return `<div style="background: #ebf8ff; border-left: 4px solid #4299e1; padding: 15px; margin: 10px 0; border-radius: 4px;">${block.content}</div>`;
+            case 'divider':
+              return `<hr style="border: none; border-top: 2px solid #e2e8f0; margin: 20px 0;">`;
+            default:
+              return `<p>${block.content}</p>`;
+          }
+        }).join('')}
+      </div>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${pageTitle}</title>
+          <style>
+            @media print {
+              body { margin: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+    setShowExportMenu(false);
+  };
+
+  // Utility functions for export
+  const stripHtml = (html) => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+  };
+
+  const escapeHtml = (text) => {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  };
+
+  const downloadFile = (content, filename, mimeType) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleSavePage = async () => {
     if (!page || !user?.token || !canEdit) return;
     
     setSaving(true);
-    const res = await updatePage(page._id, {
-      title: pageTitle || 'Untitled',
-      icon: selectedEmoji
-    }, user.token);
-    
-    if (res.success) {
-      if (onUpdate) {
-        onUpdate({ ...page, title: pageTitle || 'Untitled', icon: selectedEmoji });
+    try {
+      const res = await updatePage(page._id, {
+        title: pageTitle || 'Untitled',
+        icon: selectedEmoji
+      }, user.token);
+      
+      if (res.success) {
+        if (onUpdate) {
+          onUpdate({ ...page, title: pageTitle || 'Untitled', icon: selectedEmoji });
+        }
+      } else {
+        alert('Failed to save page: ' + res.error);
       }
-    } else {
-      alert('Failed to save page: ' + res.error);
+    } catch (error) {
+      alert('Failed to save page: ' + error.message);
     }
     setSaving(false);
   };
@@ -104,26 +322,34 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
   const handleToggleFavorite = async () => {
     if (!page || !user?.token || !isOwner) return;
     
-    const res = await toggleFavorite(page._id, user.token);
-    if (res.success) {
-      setIsFavorite(!isFavorite);
-      if (onUpdate) {
-        onUpdate({ ...page, isFavorite: !isFavorite });
+    try {
+      const res = await toggleFavorite(page._id, user.token);
+      if (res.success) {
+        setIsFavorite(!isFavorite);
+        if (onUpdate) {
+          onUpdate({ ...page, isFavorite: !isFavorite });
+        }
       }
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
     }
   };
 
   const handleDuplicate = async () => {
     if (!page || !user?.token) return;
     
-    const res = await duplicatePage(page._id, user.token);
-    if (res.success) {
-      alert('Page duplicated successfully!');
-      if (onUpdate) {
-        onUpdate(res.page);
+    try {
+      const res = await duplicatePage(page._id, user.token);
+      if (res.success) {
+        alert('Page duplicated successfully!');
+        if (onUpdate) {
+          onUpdate(res.page);
+        }
+      } else {
+        alert('Failed to duplicate page: ' + res.error);
       }
-    } else {
-      alert('Failed to duplicate page: ' + res.error);
+    } catch (error) {
+      alert('Failed to duplicate page: ' + error.message);
     }
     setShowMoreMenu(false);
   };
@@ -131,6 +357,21 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
   const handleShare = () => {
     setShowShareModal(true);
     setShowMoreMenu(false);
+  };
+
+  const handleCopyLink = () => {
+    const link = `${window.location.origin}/page/${page._id}`;
+    navigator.clipboard.writeText(link).then(() => {
+      alert('Link copied to clipboard!');
+    }).catch(() => {
+      alert('Failed to copy link');
+    });
+    setShowMoreMenu(false);
+  };
+
+  // Add back to dashboard function
+  const handleBackToDashboard = () => {
+    navigate('/dashboard');
   };
 
   const handleBlockContentChange = async (blockId, content) => {
@@ -144,7 +385,11 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
     ));
 
     if (user?.token) {
-      await updateBlock(blockId, { content }, user.token);
+      try {
+        await updateBlock(blockId, { content }, user.token);
+      } catch (error) {
+        console.error('Failed to update block:', error);
+      }
     }
   };
 
@@ -156,7 +401,11 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
     ));
 
     if (user?.token) {
-      await updateBlock(blockId, { type: newType }, user.token);
+      try {
+        await updateBlock(blockId, { type: newType }, user.token);
+      } catch (error) {
+        console.error('Failed to update block type:', error);
+      }
     }
     setShowCommandMenu(false);
   };
@@ -171,24 +420,28 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
       b.order >= newOrder ? { ...b, order: b.order + 1 } : b
     );
 
-    const res = await createBlock({
-      pageId: page._id,
-      type,
-      content: '',
-      order: newOrder
-    }, user.token);
+    try {
+      const res = await createBlock({
+        pageId: page._id,
+        type,
+        content: '',
+        order: newOrder
+      }, user.token);
 
-    if (res.success) {
-      const allBlocks = [...updatedBlocks, res.block].sort((a, b) => a.order - b.order);
-      setBlocks(allBlocks);
+      if (res.success) {
+        const allBlocks = [...updatedBlocks, res.block].sort((a, b) => a.order - b.order);
+        setBlocks(allBlocks);
 
-      setTimeout(() => {
-        const newBlockElement = blockRefs.current[res.block._id];
-        if (newBlockElement) {
-          newBlockElement.focus();
-          setFocusedBlockId(res.block._id);
-        }
-      }, 0);
+        setTimeout(() => {
+          const newBlockElement = blockRefs.current[res.block._id];
+          if (newBlockElement) {
+            newBlockElement.focus();
+            setFocusedBlockId(res.block._id);
+          }
+        }, 0);
+      }
+    } catch (error) {
+      console.error('Failed to create block:', error);
     }
   };
 
@@ -196,20 +449,25 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
     if (!user?.token || blocks.length === 1 || !canEdit) return;
 
     const blockIndex = blocks.findIndex(b => b._id === blockId);
-    const res = await deleteBlock(blockId, user.token);
     
-    if (res.success) {
-      setBlocks(blocks.filter(b => b._id !== blockId));
+    try {
+      const res = await deleteBlock(blockId, user.token);
+      
+      if (res.success) {
+        setBlocks(blocks.filter(b => b._id !== blockId));
 
-      if (blockIndex > 0) {
-        const prevBlock = blocks[blockIndex - 1];
-        setTimeout(() => {
-          const prevBlockElement = blockRefs.current[prevBlock._id];
-          if (prevBlockElement) {
-            prevBlockElement.focus();
-          }
-        }, 0);
+        if (blockIndex > 0) {
+          const prevBlock = blocks[blockIndex - 1];
+          setTimeout(() => {
+            const prevBlockElement = blockRefs.current[prevBlock._id];
+            if (prevBlockElement) {
+              prevBlockElement.focus();
+            }
+          }, 0);
+        }
       }
+    } catch (error) {
+      console.error('Failed to delete block:', error);
     }
   };
 
@@ -371,7 +629,14 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
           )}
           {block.type === 'todo' && (
             <div className="flex items-start gap-2">
-              <input type="checkbox" className="mt-1.5 w-4 h-4 rounded border-gray-600 bg-neutral-800" disabled={!canEdit} />
+              <input 
+                type="checkbox" 
+                className="mt-1.5 w-4 h-4 rounded border-gray-600 bg-neutral-800" 
+                disabled={!canEdit}
+                onChange={(e) => {
+                  // Handle checkbox state change if needed
+                }}
+              />
               <div
                 ref={el => blockRefs.current[block._id] = el}
                 contentEditable={canEdit}
@@ -430,6 +695,9 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
       if (moreMenuRef.current && !moreMenuRef.current.contains(event.target)) {
         setShowMoreMenu(false);
       }
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
+        setShowExportMenu(false);
+      }
       if (showCommandMenu && !event.target.closest('.command-menu-wrapper')) {
         setShowCommandMenu(false);
       }
@@ -437,18 +705,41 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMoreMenu, showCommandMenu]);
+  }, [showMoreMenu, showExportMenu, showCommandMenu]);
 
-  if (!page) return null;
+  if (!page) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-neutral-900 text-white">
+        <div className="text-center">
+          <p className="text-gray-400">Page not found</p>
+          <button 
+            onClick={handleBackToDashboard}
+            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-neutral-900 text-white">
       {/* Top Bar */}
       <div className="border-b border-neutral-800 px-6 py-3 flex items-center justify-between bg-neutral-900/95 backdrop-blur-sm sticky top-0 z-10">
         <div className="flex items-center gap-3">
+          {/* Back Button */}
+          <button 
+            onClick={handleBackToDashboard}
+            className="p-2 hover:bg-neutral-800 rounded transition-colors"
+            title="Back to Dashboard"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          
           <span className="text-2xl">{selectedEmoji}</span>
           <span className="text-sm text-gray-400">{pageTitle || 'Untitled'}</span>
-          {page.userRole && (
+          {page.userRole && page.userRole !== 'owner' && (
             <span className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 bg-neutral-800 rounded">
               <Lock className="w-3 h-3" />
               {page.userRole.charAt(0).toUpperCase() + page.userRole.slice(1)}
@@ -483,6 +774,51 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
               {isFavorite ? <Star className="w-4 h-4 fill-current" /> : <Star className="w-4 h-4" />}
             </button>
           )}
+          
+          {/* Export Button */}
+          <div className="relative" ref={exportMenuRef}>
+            <button 
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="p-1.5 hover:bg-neutral-800 rounded transition-colors"
+              title="Export page"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+
+            {showExportMenu && (
+              <div className="absolute right-0 top-full mt-1 w-48 bg-neutral-800 border border-neutral-700 rounded-lg shadow-2xl py-1 z-50">
+                <button 
+                  onClick={exportToMarkdown}
+                  className="w-full px-3 py-2 text-sm text-left hover:bg-neutral-700 flex items-center gap-2 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  Export as Markdown
+                </button>
+                <button 
+                  onClick={exportToText}
+                  className="w-full px-3 py-2 text-sm text-left hover:bg-neutral-700 flex items-center gap-2 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  Export as Text
+                </button>
+                <button 
+                  onClick={exportToHTML}
+                  className="w-full px-3 py-2 text-sm text-left hover:bg-neutral-700 flex items-center gap-2 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  Export as HTML
+                </button>
+                <button 
+                  onClick={exportToPDF}
+                  className="w-full px-3 py-2 text-sm text-left hover:bg-neutral-700 flex items-center gap-2 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  Export as PDF
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="relative" ref={moreMenuRef}>
             <button 
               onClick={() => setShowMoreMenu(!showMoreMenu)}
@@ -509,13 +845,12 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
                     Manage sharing
                   </button>
                 )}
-                <button className="w-full px-3 py-2 text-sm text-left hover:bg-neutral-700 flex items-center gap-2 transition-colors">
+                <button 
+                  onClick={handleCopyLink}
+                  className="w-full px-3 py-2 text-sm text-left hover:bg-neutral-700 flex items-center gap-2 transition-colors"
+                >
                   <Share2 className="w-4 h-4" />
                   Copy link
-                </button>
-                <button className="w-full px-3 py-2 text-sm text-left hover:bg-neutral-700 flex items-center gap-2 transition-colors">
-                  <Download className="w-4 h-4" />
-                  Export
                 </button>
                 {isOwner && (
                   <>

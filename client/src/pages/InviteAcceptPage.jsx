@@ -42,8 +42,13 @@ export default function InviteAcceptPage() {
           'Someone'
       });
       
+      // Redirect to the page with proper URL
       setTimeout(() => {
-        navigate(`/page/${res.page?._id || ''}`);
+        if (res.page?._id) {
+          navigate(`/page/${res.page._id}`);
+        } else {
+          navigate('/');
+        }
       }, 2000);
     } else {
       setError(res.error || 'Failed to accept invitation');

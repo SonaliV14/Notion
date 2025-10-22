@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Home, FileText, Settings, Plus, Search, Inbox, ChevronDown, 
   ChevronRight, Trash2, Clock, Edit3, FilePlus, Star, Users,
-  Link as LinkIcon, Copy, Check, X
+  Link as LinkIcon, Copy, Check, X, ChevronLeft
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { usePages } from '../contexts/PageContext.jsx';
@@ -10,10 +11,13 @@ import PageEditor from '../components/PageEditor.jsx';
 import { 
   searchPages as searchPagesAPI, 
   getSharedPages,
-  getFavoritePages 
+  getFavoritePages,
+  getCollaboratedPages 
 } from '../services/api';
 
 export default function Dashboard() {
+  const { pageId } = useParams();
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { 
     pages, 
@@ -25,7 +29,10 @@ export default function Dashboard() {
     fetchTrashPages, 
     duplicatePage: duplicatePageContext,
     toggleFavorite: toggleFavoriteContext,
-    loading 
+    loading,
+    fetchSharedPages,
+    sharedPages,
+    fetchCollaboratedPages
   } = usePages();
   
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -39,7 +46,6 @@ export default function Dashboard() {
     shared: false
   });
   const [editingPage, setEditingPage] = useState(null);
-  const [sharedPages, setSharedPages] = useState([]);
   const [favoritePages, setFavoritePages] = useState([]);
   const [inboxPages, setInboxPages] = useState([]);
 
@@ -50,17 +56,18 @@ export default function Dashboard() {
     }));
   };
 
-  // Fetch shared pages
-  const fetchSharedPages = async () => {
+  // Fetch collaborated pages (pages shared with user)
+  const loadCollaboratedPages = async () => {
     if (!user?.token) return;
-    const res = await getSharedPages(user.token);
-    if (res.success) {
-      setSharedPages(res.pages);
+    try {
+      await fetchCollaboratedPages();
+    } catch (error) {
+      console.error('Failed to fetch collaborated pages:', error);
     }
   };
 
   // Fetch favorite pages
-  const fetchFavoritePages = async () => {
+  const fetchFavoritePagesList = async () => {
     if (!user?.token) return;
     const res = await getFavoritePages(user.token);
     if (res.success) {
@@ -68,19 +75,21 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch inbox (recently shared pages)
-  const fetchInboxPages = async () => {
+  // Fetch inbox (recently collaborated pages)
+  const fetchInboxPagesList = async () => {
     if (!user?.token) return;
-    const res = await getSharedPages(user.token);
-    if (res.success) {
-      // Get only recently shared pages (last 7 days)
-      const recentPages = res.pages.filter(page => {
-        const shared = page.sharedWith.find(s => s.user._id === user.id);
-        if (!shared) return false;
-        const daysSinceShared = (Date.now() - new Date(shared.sharedAt)) / (1000 * 60 * 60 * 24);
-        return daysSinceShared <= 7;
-      });
-      setInboxPages(recentPages);
+    try {
+      const res = await getCollaboratedPages(user.token);
+      if (res.success) {
+        // Get only recently collaborated pages (last 7 days)
+        const recentPages = res.pages.filter(page => {
+          const daysSinceShared = (Date.now() - new Date(page.createdAt)) / (1000 * 60 * 60 * 24);
+          return daysSinceShared <= 7;
+        });
+        setInboxPages(recentPages);
+      }
+    } catch (error) {
+      console.error('Failed to fetch inbox pages:', error);
     }
   };
 
@@ -121,27 +130,56 @@ export default function Dashboard() {
       return;
     }
     
+    // Navigate to the new page
+    navigate(`/page/${created._id}`);
     setEditingPage(created);
     setCurrentView('editor');
   };
 
   const handleOpenPage = (page) => {
-    setEditingPage(page);
+    // Add userRole information to the page object for PageEditor
+    const pageWithRole = {
+      ...page,
+      userRole: page.userRole || (page.owner?._id === user._id ? 'owner' : 'editor'),
+      isOwner: page.owner?._id === user._id
+    };
+    
+    // Update URL and set editing page
+    navigate(`/page/${page._id}`);
+    setEditingPage(pageWithRole);
     setCurrentView('editor');
   };
 
   const handleDeletePage = async (pageId) => {
-    const success = await moveToTrash(pageId);
-    if (success) {
-      alert("Page moved to trash");
+    // Only allow deletion if user is owner
+    const pageToDelete = pages.find(p => p._id === pageId) || sharedPages.find(p => p._id === pageId);
+    if (pageToDelete && pageToDelete.owner?._id === user._id) {
+      const success = await moveToTrash(pageId);
+      if (success) {
+        alert("Page moved to trash");
+        // If we're currently viewing this page, go back to home
+        if (editingPage && editingPage._id === pageId) {
+          navigate('/');
+          setCurrentView('home');
+          setEditingPage(null);
+        }
+      }
+    } else {
+      alert("Only page owner can delete pages");
     }
   };
 
   const handleDeleteCurrentPage = async (pageId) => {
-    const success = await moveToTrash(pageId);
-    if (success) {
-      setCurrentView('home');
-      setEditingPage(null);
+    const pageToDelete = pages.find(p => p._id === pageId) || sharedPages.find(p => p._id === pageId);
+    if (pageToDelete && pageToDelete.owner?._id === user._id) {
+      const success = await moveToTrash(pageId);
+      if (success) {
+        navigate('/');
+        setCurrentView('home');
+        setEditingPage(null);
+      }
+    } else {
+      alert("Only page owner can delete pages");
     }
   };
 
@@ -176,17 +214,45 @@ export default function Dashboard() {
     setEditingPage(updatedPage);
   };
 
+  // Load page from URL when component mounts or pageId changes
+  useEffect(() => {
+    if (pageId) {
+      // Find the page in either owned pages or shared pages
+      const foundPage = pages.find(p => p._id === pageId) || sharedPages.find(p => p._id === pageId);
+      
+      if (foundPage) {
+        const pageWithRole = {
+          ...foundPage,
+          userRole: foundPage.userRole || (foundPage.owner?._id === user._id ? 'owner' : 'editor'),
+          isOwner: foundPage.owner?._id === user._id
+        };
+        setEditingPage(pageWithRole);
+        setCurrentView('editor');
+      } else {
+        // Page not found, redirect to home
+        navigate('/');
+      }
+    }
+  }, [pageId, pages, sharedPages, user, navigate]);
+
   useEffect(() => {
     if (currentView === 'trash') {
       fetchTrashPages();
     } else if (currentView === 'shared') {
-      fetchSharedPages();
+      loadCollaboratedPages();
     } else if (currentView === 'favorites') {
-      fetchFavoritePages();
+      fetchFavoritePagesList();
     } else if (currentView === 'inbox') {
-      fetchInboxPages();
+      fetchInboxPagesList();
     }
   }, [currentView]);
+
+  // Load shared pages on component mount
+  useEffect(() => {
+    if (user?.token) {
+      loadCollaboratedPages();
+    }
+  }, [user]);
 
   if (!user) {
     return (
@@ -225,14 +291,22 @@ export default function Dashboard() {
               <span>Search</span>
             </button>
             <button 
-              onClick={() => setCurrentView('home')}
+              onClick={() => {
+                navigate('/');
+                setCurrentView('home');
+                setEditingPage(null);
+              }}
               className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded ${currentView === 'home' ? 'bg-neutral-700' : ''}`}
             >
               <Home className="w-4 h-4" />
               <span>Home</span>
             </button>
             <button 
-              onClick={() => setCurrentView('inbox')}
+              onClick={() => {
+                navigate('/');
+                setCurrentView('inbox');
+                setEditingPage(null);
+              }}
               className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded ${currentView === 'inbox' ? 'bg-neutral-700' : ''}`}
             >
               <Inbox className="w-4 h-4" />
@@ -256,21 +330,49 @@ export default function Dashboard() {
               <span>Create Page</span>
             </button>
             <button 
-              onClick={() => setCurrentView('my-pages')}
+              onClick={() => {
+                navigate('/');
+                setCurrentView('my-pages');
+                setEditingPage(null);
+              }}
               className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded ${currentView === 'my-pages' ? 'bg-neutral-700' : ''}`}
             >
               <FileText className="w-4 h-4" />
               <span>My Pages</span>
             </button>
             <button 
-              onClick={() => setCurrentView('favorites')}
+              onClick={() => {
+                navigate('/');
+                setCurrentView('favorites');
+                setEditingPage(null);
+              }}
               className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded ${currentView === 'favorites' ? 'bg-neutral-700' : ''}`}
             >
               <Star className="w-4 h-4" />
               <span>Favorites</span>
             </button>
             <button 
-              onClick={() => setCurrentView('trash')}
+              onClick={() => {
+                navigate('/');
+                setCurrentView('shared');
+                setEditingPage(null);
+              }}
+              className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded ${currentView === 'shared' ? 'bg-neutral-700' : ''}`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Shared with me</span>
+              {sharedPages.length > 0 && (
+                <span className="ml-auto text-xs bg-blue-600 px-1 py-0.5 rounded-full text-xs">
+                  {sharedPages.length}
+                </span>
+              )}
+            </button>
+            <button 
+              onClick={() => {
+                navigate('/');
+                setCurrentView('trash');
+                setEditingPage(null);
+              }}
               className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded ${currentView === 'trash' ? 'bg-neutral-700' : ''}`}
             >
               <Trash2 className="w-4 h-4" />
@@ -316,13 +418,18 @@ export default function Dashboard() {
               onClick={() => {
                 toggleSection('shared');
                 if (!expandedSections.shared) {
-                  fetchSharedPages();
+                  loadCollaboratedPages();
                 }
               }}
               className="w-full flex items-center gap-1 px-2 py-1 text-xs font-semibold text-gray-400 hover:bg-neutral-700 rounded"
             >
               {expandedSections.shared ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
               <span>Shared with me</span>
+              {sharedPages.length > 0 && (
+                <span className="ml-auto text-xs bg-blue-600 px-1.5 py-0.5 rounded-full">
+                  {sharedPages.length}
+                </span>
+              )}
             </button>
             {expandedSections.shared && (
               <div className="mt-1 space-y-0.5">
@@ -337,6 +444,13 @@ export default function Dashboard() {
                     >
                       <Users className="w-4 h-4" />
                       <span className="flex-1 text-left truncate">{page.title}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${
+                        page.userRole === 'viewer' 
+                          ? 'bg-yellow-900 text-yellow-200' 
+                          : 'bg-blue-900 text-blue-200'
+                      }`}>
+                        {page.userRole}
+                      </span>
                     </button>
                   ))
                 )}
@@ -409,7 +523,7 @@ export default function Dashboard() {
                         <div className="flex-1">
                           <h3 className="text-sm font-medium">{page.title}</h3>
                           <p className="text-xs text-gray-500">
-                            Updated {new Date(page.updatedAt).toLocaleDateString()}
+                            {page.owner?._id === user._id ? 'My page' : `Shared by ${page.owner?.firstname}`}
                           </p>
                         </div>
                       </button>
@@ -449,7 +563,7 @@ export default function Dashboard() {
                   <h2 className="text-sm font-medium text-gray-400">Recently visited</h2>
                 </div>
                 <div className="grid grid-cols-5 gap-4">
-                  {pages.slice(0, 9).map((page) => (
+                  {[...pages, ...sharedPages].slice(0, 9).map((page) => (
                     <button 
                       key={page._id}
                       onClick={() => handleOpenPage(page)}
@@ -461,11 +575,30 @@ export default function Dashboard() {
                       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
                         <div className="text-sm font-medium text-left text-white truncate">{page.title}</div>
                         <div className="text-xs text-gray-300 text-left flex items-center gap-1">
-                          <span className="text-xs">{user.firstname?.[0]}</span>
+                          {page.owner?._id === user._id ? (
+                            <>
+                              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                              <span>You</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                              <span>{page.owner?.firstname}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                       {page.isFavorite && (
                         <Star className="absolute top-2 right-2 w-4 h-4 text-yellow-500 fill-current" />
+                      )}
+                      {page.userRole && page.userRole !== 'owner' && (
+                        <div className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-xs ${
+                          page.userRole === 'viewer' 
+                            ? 'bg-yellow-900 text-yellow-200' 
+                            : 'bg-blue-900 text-blue-200'
+                        }`}>
+                          {page.userRole}
+                        </div>
                       )}
                     </button>
                   ))}
@@ -481,40 +614,55 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* INBOX VIEW */}
-        {currentView === 'inbox' && (
+        {/* SHARED PAGES VIEW */}
+        {currentView === 'shared' && (
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-6xl mx-auto px-20 py-16">
               <div className="mb-8">
-                <h1 className="text-3xl font-bold mb-2">Inbox</h1>
-                <p className="text-gray-400">Pages recently shared with you</p>
+                <h1 className="text-3xl font-bold mb-2">Shared with me</h1>
+                <p className="text-gray-400">Pages others have shared with you</p>
               </div>
 
-              {inboxPages.length === 0 ? (
+              {sharedPages.length === 0 ? (
                 <div className="text-center py-12">
-                  <Inbox className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium text-gray-400 mb-2">Inbox is empty</h3>
-                  <p className="text-gray-500">Shared pages will appear here</p>
+                  <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-400 mb-2">No shared pages yet</h3>
+                  <p className="text-gray-500">When someone shares a page with you, it will appear here</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {inboxPages.map((page) => (
+                <div className="space-y-3">
+                  {sharedPages.map((page) => (
                     <div 
                       key={page._id}
                       className="flex items-center justify-between p-4 bg-neutral-800 hover:bg-neutral-750 rounded-lg border border-neutral-700 transition-colors"
                     >
                       <button 
                         onClick={() => handleOpenPage(page)}
-                        className="flex items-center gap-3 flex-1"
+                        className="flex items-center gap-4 flex-1 text-left"
                       >
-                        <Users className="w-5 h-5 text-gray-400" />
-                        <div className="text-left">
-                          <h3 className="font-medium">{page.title}</h3>
-                          <p className="text-sm text-gray-500">
-                            Shared by {page.owner?.firstname} {page.owner?.lastname}
-                          </p>
+                        <div className="flex items-center gap-3 flex-1">
+                          <Users className="w-5 h-5 text-gray-400" />
+                          <div>
+                            <h3 className="font-medium text-white">{page.title}</h3>
+                            <p className="text-sm text-gray-500">
+                              Shared by {page.owner?.firstname} {page.owner?.lastname}
+                            </p>
+                          </div>
+                        </div>
+                        <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          page.userRole === 'viewer' 
+                            ? 'bg-yellow-900 text-yellow-200' 
+                            : 'bg-blue-900 text-blue-200'
+                        }`}>
+                          {page.userRole === 'viewer' ? 'View only' : 'Can edit'}
                         </div>
                       </button>
+                      
+                      <div className="flex items-center gap-2">
+                        {page.isFavorite && (
+                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -525,83 +673,80 @@ export default function Dashboard() {
 
         {/* MY PAGES VIEW */}
         {currentView === 'my-pages' && (
-  <div className="flex-1 overflow-y-auto">
-    <div className="max-w-6xl mx-auto px-20 py-16">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">My Pages</h1>
-        <p className="text-gray-400">All your pages in one place</p>
-      </div>
-
-      {loading ? (
-        <div className="text-center text-gray-400 py-12">Loading pages...</div>
-      ) : pages.length === 0 ? (
-        <div className="text-center py-12">
-          <FileText className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-xl font-medium text-gray-400 mb-2">No pages yet</h3>
-          <p className="text-gray-500 mb-6">Create your first page to get started</p>
-          <button 
-            onClick={handleCreatePage}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium inline-flex items-center gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            Create Page
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {pages.map((page) => (
-            <div 
-              key={page._id}
-              className="flex items-center justify-between p-4 bg-neutral-800 hover:bg-neutral-750 rounded-lg border border-neutral-700 transition-colors"
-            >
-              <button 
-                onClick={() => handleOpenPage(page)}
-                className="flex items-center gap-3 flex-1 text-left"
-              >
-                <FileText className="w-5 h-5 text-gray-400" />
-                <div>
-                  <h3 className="font-medium text-gray-300">{page.title}</h3>
-                  <p className="text-sm text-gray-500">
-                    Updated {new Date(page.updatedAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </button>
-
-              <div className="flex items-center gap-2">
-                {/* Toggle Favorite */}
-                <button 
-                  onClick={() => handleToggleFavorite(page._id)}
-                  className="p-2 hover:bg-neutral-700 rounded text-gray-400 hover:text-yellow-400 transition-colors"
-                  title="Toggle Favorite"
-                >
-                  <Star className={`w-4 h-4 ${page.isFavorite ? 'text-yellow-500 fill-current' : ''}`} />
-                </button>
-
-                {/* Duplicate Page */}
-                <button 
-                  onClick={() => handleDuplicatePage(page._id)}
-                  className="p-2 hover:bg-neutral-700 rounded text-gray-400 hover:text-white transition-colors"
-                  title="Duplicate Page"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
-
-                {/* Move to Trash */}
-                <button 
-                  onClick={() => handleDeletePage(page._id)}
-                  className="p-2 hover:bg-neutral-700 rounded text-gray-400 hover:text-red-500 transition-colors"
-                  title="Move to Trash"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-6xl mx-auto px-20 py-16">
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold mb-2">My Pages</h1>
+                <p className="text-gray-400">All your pages in one place</p>
               </div>
+
+              {loading ? (
+                <div className="text-center text-gray-400 py-12">Loading pages...</div>
+              ) : pages.length === 0 ? (
+                <div className="text-center py-12">
+                  <FileText className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-400 mb-2">No pages yet</h3>
+                  <p className="text-gray-500 mb-6">Create your first page to get started</p>
+                  <button 
+                    onClick={handleCreatePage}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium inline-flex items-center gap-2"
+                  >
+                    <Plus className="w-5 h-5" />
+                    Create Page
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {pages.map((page) => (
+                    <div 
+                      key={page._id}
+                      className="flex items-center justify-between p-4 bg-neutral-800 hover:bg-neutral-750 rounded-lg border border-neutral-700 transition-colors"
+                    >
+                      <button 
+                        onClick={() => handleOpenPage(page)}
+                        className="flex items-center gap-3 flex-1 text-left"
+                      >
+                        <FileText className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <h3 className="font-medium text-gray-300">{page.title}</h3>
+                          <p className="text-sm text-gray-500">
+                            Updated {new Date(page.updatedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </button>
+
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handleToggleFavorite(page._id)}
+                          className="p-2 hover:bg-neutral-700 rounded text-gray-400 hover:text-yellow-400 transition-colors"
+                          title="Toggle Favorite"
+                        >
+                          <Star className={`w-4 h-4 ${page.isFavorite ? 'text-yellow-500 fill-current' : ''}`} />
+                        </button>
+
+                        <button 
+                          onClick={() => handleDuplicatePage(page._id)}
+                          className="p-2 hover:bg-neutral-700 rounded text-gray-400 hover:text-white transition-colors"
+                          title="Duplicate Page"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+
+                        <button 
+                          onClick={() => handleDeletePage(page._id)}
+                          className="p-2 hover:bg-neutral-700 rounded text-gray-400 hover:text-red-500 transition-colors"
+                          title="Move to Trash"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-      )}
-    </div>
-  </div>
-)}
+          </div>
+        )}
 
         {/* FAVORITES VIEW */}
         {currentView === 'favorites' && (
@@ -642,48 +787,6 @@ export default function Dashboard() {
                         className="p-2 hover:bg-neutral-700 rounded text-yellow-500 hover:text-gray-400 transition-colors"
                       >
                         <Star className="w-4 h-4 fill-current" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* SHARED VIEW */}
-        {currentView === 'shared' && (
-          <div className="flex-1 overflow-y-auto">
-            <div className="max-w-6xl mx-auto px-20 py-16">
-              <div className="mb-8">
-                <h1 className="text-3xl font-bold mb-2">Shared with me</h1>
-                <p className="text-gray-400">Pages others have shared with you</p>
-              </div>
-
-              {sharedPages.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium text-gray-400 mb-2">No shared pages</h3>
-                  <p className="text-gray-500">Pages shared with you will appear here</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {sharedPages.map((page) => (
-                    <div 
-                      key={page._id}
-                      className="flex items-center justify-between p-4 bg-neutral-800 hover:bg-neutral-750 rounded-lg border border-neutral-700 transition-colors"
-                    >
-                      <button 
-                        onClick={() => handleOpenPage(page)}
-                        className="flex items-center gap-3 flex-1"
-                      >
-                        <Users className="w-5 h-5 text-gray-400" />
-                        <div className="text-left">
-                          <h3 className="font-medium">{page.title}</h3>
-                          <p className="text-sm text-gray-500">
-                            Shared by {page.owner?.firstname} {page.owner?.lastname}
-                          </p>
-                        </div>
                       </button>
                     </div>
                   ))}
