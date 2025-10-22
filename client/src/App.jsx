@@ -27,6 +27,15 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
       <Route path="/signup" element={user ? <Navigate to="/dashboard" /> : <Signup />} />
       <Route path="/contact-us" element={<ContactUs />} />
+
+      <Route
+        path="/page/:pageId"
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      />
       
       {/* Invite Accept Route - Protected */}
       <Route

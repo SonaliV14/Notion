@@ -438,19 +438,6 @@ export const rejectInvite = async (inviteToken) => {
   }
 };
 
-// Get pending invitations for current user
-export const getPendingInvites = async () => {
-  try {
-    const { data } = await protectedApi.get(`/collaborators/invites/pending`);
-    return data;
-  } catch (err) {
-    return {
-      success: false,
-      error: err.response?.data?.error || "Failed to fetch pending invites",
-    };
-  }
-};
-
 // Get invite details by token
 export const getInviteDetails = async (inviteToken) => {
   try {
@@ -460,6 +447,19 @@ export const getInviteDetails = async (inviteToken) => {
     return {
       success: false,
       error: err.response?.data?.error || "Failed to fetch invite details",
+    };
+  }
+};
+
+// Get pending invitations for current user
+export const getPendingInvites = async () => {
+  try {
+    const { data } = await protectedApi.get(`/collaborators/invites/pending`);
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      error: err.response?.data?.error || "Failed to fetch pending invites",
     };
   }
 };

@@ -8,7 +8,8 @@ import {
   rejectInvite,
   updateCollaboratorRole,
   removeCollaborator,
-  getPendingInvites
+  getPendingInvites,
+  getInviteDetails
 } from "../controllers/CollaboratorController.js";
 
 const router = express.Router();
@@ -25,14 +26,10 @@ router.get("/pages/:pageId/collaborators", getPageCollaborators);
 // Get all pages where user is a collaborator
 router.get("/collaborated-pages", getCollaboratedPages);
 
-// Get pending invitations for current user
+router.post("/invites/accept/:token", acceptInvite);
+router.post("/invites/reject/:token", rejectInvite);
+router.get("/invites/details/:token", getInviteDetails); // ✅ ADD THIS ROUTE
 router.get("/invites/pending", getPendingInvites);
-
-// Accept collaboration invite
-router.post("/invites/accept/:token", acceptInvite);  // ✅ FIXED: Changed route order
-
-// Reject collaboration invite
-router.post("/invites/reject/:token", rejectInvite);  // ✅ FIXED: Changed route order
 
 // Update collaborator role
 router.patch("/collaborators/:collaboratorId/role", updateCollaboratorRole);

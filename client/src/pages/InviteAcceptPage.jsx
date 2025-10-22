@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { acceptInvite, rejectInvite } from '../services/api';
+import { acceptInvite, rejectInvite, getInviteDetails } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { CheckCircle, XCircle, Loader, Mail, FileText, Users, AlertTriangle } from 'lucide-react';
 
@@ -13,6 +13,27 @@ export default function InviteAcceptPage() {
   const [success, setSuccess] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [inviteData, setInviteData] = useState(null);
+
+    useEffect(() => {
+    const loadInviteDetails = async () => {
+      if (!token) return;
+      
+      try {
+        const res = await getInviteDetails(token);
+        if (res.success) {
+          setInviteData(res.invite);
+        } else {
+          setError(res.error || 'Failed to load invitation details');
+        }
+      } catch (error) {
+        setError('Failed to load invitation details');
+      } finally {
+        setLoadingInvite(false);
+      }
+    };
+
+    loadInviteDetails();
+  }, [token]);
 
   useEffect(() => {
     if (!user) {
