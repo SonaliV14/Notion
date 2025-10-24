@@ -409,8 +409,7 @@ export const getInviteDetails = async (req, res) => {
 
     const collaborator = await Collaborator.findOne({ inviteToken: token })
       .populate('pageId', 'title owner')
-      .populate('invitedBy', 'firstname lastname email')
-      .populate('owner', 'firstname lastname email');
+      .populate('invitedBy', 'firstname lastname email');
 
     if (!collaborator) {
       return res.status(404).json({ success: false, error: "Invalid invitation token" });
@@ -429,6 +428,9 @@ export const getInviteDetails = async (req, res) => {
     if (new Date() > collaborator.inviteExpiresAt) {
       return res.status(400).json({ success: false, error: "Invitation has expired" });
     }
+
+    // Populate the page owner separately
+    await collaborator.pageId.populate('owner', 'firstname lastname email');
 
     res.status(200).json({ 
       success: true, 

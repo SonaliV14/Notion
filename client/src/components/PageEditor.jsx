@@ -972,10 +972,11 @@ export default function PageEditor({ page, onDelete, onUpdate }) {
 
       {/* Share Modal */}
       <ShareModal 
-        page={page} 
-        isOpen={showShareModal} 
-        onClose={() => setShowShareModal(false)} 
-      />
+  page={page} 
+  isOpen={showShareModal} 
+  onClose={() => setShowShareModal(false)}
+  onUpdate={onUpdate} // Add this if you want to update the page in parent
+/>
 
       {/* Style for placeholder */}
       <style>{`

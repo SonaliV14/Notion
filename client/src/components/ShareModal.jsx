@@ -9,7 +9,7 @@ import {
   updatePage 
 } from '../services/api';
 
-export default function ShareModal({ page: propPage, isOpen, onClose }) {
+export default function ShareModal({ page: propPage, isOpen, onClose, onUpdate }) {
   const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('editor');
@@ -21,12 +21,33 @@ export default function ShareModal({ page: propPage, isOpen, onClose }) {
   const [showAccessDropdown, setShowAccessDropdown] = useState(false);
   const [page, setPage] = useState(propPage);
   
+  // Reset state when modal closes
   useEffect(() => {
-    if (isOpen && page) {
-      loadCollaborators();
-      setGeneralAccess(page.permissions || 'private');
+    if (!isOpen) {
+      setEmail('');
+      setRole('editor');
+      setCollaborators([]);
+      setLoading(false);
+      setInviting(false);
+      setCopied(false);
+      setShowAccessDropdown(false);
     }
-  }, [isOpen, page]);
+  }, [isOpen]);
+
+  // Update page state when propPage changes
+  useEffect(() => {
+    if (propPage) {
+      setPage(propPage);
+      setGeneralAccess(propPage.permissions || 'private');
+    }
+  }, [propPage]);
+
+  // Load collaborators when modal opens or page changes
+  useEffect(() => {
+    if (isOpen && page?._id) {
+      loadCollaborators();
+    }
+  }, [isOpen, page?._id]); // Added page._id as dependency
 
   const loadCollaborators = async () => {
     if (!page?._id) return;
@@ -56,7 +77,8 @@ export default function ShareModal({ page: propPage, isOpen, onClose }) {
         alert('Invitation sent successfully!');
         setEmail('');
         setRole('editor');
-        loadCollaborators();
+        // Reload collaborators to show the new invitation
+        await loadCollaborators();
       } else {
         alert('Failed to send invitation: ' + res.error);
       }
@@ -70,7 +92,8 @@ export default function ShareModal({ page: propPage, isOpen, onClose }) {
     try {
       const res = await updateCollaboratorRole(collaboratorId, newRole);
       if (res.success) {
-        loadCollaborators();
+        // Reload collaborators to reflect the role change
+        await loadCollaborators();
       } else {
         alert('Failed to update role: ' + res.error);
       }
@@ -85,7 +108,8 @@ export default function ShareModal({ page: propPage, isOpen, onClose }) {
     try {
       const res = await removeCollaborator(collaboratorId);
       if (res.success) {
-        loadCollaborators();
+        // Reload collaborators to reflect the removal
+        await loadCollaborators();
       } else {
         alert('Failed to remove collaborator: ' + res.error);
       }
@@ -108,14 +132,21 @@ export default function ShareModal({ page: propPage, isOpen, onClose }) {
     if (page?._id) {
       try {
         const res = await updatePage(page._id, { permissions: newAccess });
-        if (res.success) {
-          setPage(res.page);
-        }
+          if (res.success) {
+    setPage(res.page);
+    if (onUpdate) onUpdate(res.page); // Notify parent
+  }
       } catch (error) {
         console.error('Failed to update page permissions:', error);
+        // Revert on error
+        setGeneralAccess(page.permissions || 'private');
       }
     }
+    
   };
+
+  // Add onUpdate to props if you need to update parent
+  // export default function ShareModal({ page: propPage, isOpen, onClose, onUpdate }) {
 
   if (!isOpen) return null;
 

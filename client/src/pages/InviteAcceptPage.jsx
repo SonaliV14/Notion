@@ -10,11 +10,12 @@ export default function InviteAcceptPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
+   const [success, setSuccess] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [inviteData, setInviteData] = useState(null);
+  const [loadingInvite, setLoadingInvite] = useState(true);
 
-    useEffect(() => {
+  useEffect(() => {
     const loadInviteDetails = async () => {
       if (!token) return;
       
