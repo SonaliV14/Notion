@@ -33,18 +33,30 @@ export const PageProvider = ({ children }) => {
 
   // Fetch user's own pages
   const fetchPages = async () => {
-    if (!user?.token) return;
+    if (!user?.token) {
+      console.log('No user token, skipping fetchPages');
+      return;
+    }
     
     setLoading(true);
-    const res = await getUserPages(user.token);
-    if (res.success) {
-      // Add isOwner flag to all pages
-      const pagesWithOwner = res.pages.map(page => ({
-        ...page,
-        isOwner: true,
-        userRole: 'owner'
-      }));
-      setPages(pagesWithOwner);
+    console.log('Fetching user pages...');
+    try {
+      const res = await getUserPages();
+      console.log('getUserPages response:', res);
+      if (res.success) {
+        // Add isOwner flag to all pages
+        const pagesWithOwner = res.pages.map(page => ({
+          ...page,
+          isOwner: true,
+          userRole: 'owner'
+        }));
+        console.log('Setting pages:', pagesWithOwner);
+        setPages(pagesWithOwner);
+      } else {
+        console.error('Failed to fetch pages:', res.error);
+      }
+    } catch (error) {
+      console.error('Failed to fetch pages:', error);
     }
     setLoading(false);
   };
@@ -54,7 +66,7 @@ export const PageProvider = ({ children }) => {
     if (!user?.token) return;
     
     try {
-      const res = await getSharedPages(user.token);
+      const res = await getSharedPages();
       if (res.success) {
         // Add userRole and isOwner flags
         const sharedWithRoles = res.pages.map(page => ({
@@ -71,10 +83,15 @@ export const PageProvider = ({ children }) => {
 
   // Fetch collaborated pages (more accurate role information)
   const fetchCollaboratedPages = async () => {
-    if (!user?.token) return;
+    if (!user?.token) {
+      console.log('No user token, skipping fetchCollaboratedPages');
+      return;
+    }
     
+    console.log('Fetching collaborated pages...');
     try {
-      const res = await getCollaboratedPages(user.token);
+      const res = await getCollaboratedPages();
+      console.log('getCollaboratedPages response:', res);
       if (res.success) {
         // Update shared pages with accurate roles from collaborations
         const collaboratedPages = res.pages.map(collabPage => ({
@@ -82,8 +99,10 @@ export const PageProvider = ({ children }) => {
           isOwner: false, // These are always shared pages, not owned
           userRole: collabPage.userRole || 'editor'
         }));
-        
+        console.log('Setting shared pages:', collaboratedPages);
         setSharedPages(collaboratedPages);
+      } else {
+        console.error('Failed to fetch collaborated pages:', res.error);
       }
     } catch (error) {
       console.error('Failed to fetch collaborated pages:', error);
@@ -92,11 +111,23 @@ export const PageProvider = ({ children }) => {
 
   // Fetch trash pages
   const fetchTrashPages = async () => {
-    if (!user?.token) return;
+    if (!user?.token) {
+      console.log('No user token, skipping fetchTrashPages');
+      return;
+    }
     
-    const res = await getTrashPages(user.token);
-    if (res.success) {
-      setTrashPages(res.pages);
+    console.log('Fetching trash pages...');
+    try {
+      const res = await getTrashPages();
+      console.log('getTrashPages response:', res);
+      if (res.success) {
+        console.log('Setting trash pages:', res.pages);
+        setTrashPages(res.pages);
+      } else {
+        console.error('Failed to fetch trash pages:', res.error);
+      }
+    } catch (error) {
+      console.error('Failed to fetch trash pages:', error);
     }
   };
 
@@ -104,107 +135,142 @@ export const PageProvider = ({ children }) => {
   const addPage = async (pageData) => {
     if (!user?.token) return null;
     
-    const res = await createPage(pageData, user.token);
-    if (res.success) {
-      const newPage = {
-        ...res.page,
-        isOwner: true,
-        userRole: 'owner'
-      };
-      setPages(prev => [newPage, ...prev]);
-      return newPage;
+    try {
+      const res = await createPage(pageData);
+      if (res.success) {
+        const newPage = {
+          ...res.page,
+          isOwner: true,
+          userRole: 'owner'
+        };
+        setPages(prev => [newPage, ...prev]);
+        return newPage;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to create page:', error);
+      return null;
     }
-    return null;
   };
 
   // Update a page
   const updatePageContext = async (pageId, pageData) => {
     if (!user?.token) return false;
     
-    const res = await updatePage(pageId, pageData, user.token);
-    if (res.success) {
-      setPages(prev => prev.map(page => 
-        page._id === pageId ? { ...page, ...res.page } : page
-      ));
-      setSharedPages(prev => prev.map(page => 
-        page._id === pageId ? { ...page, ...res.page } : page
-      ));
-      return true;
+    try {
+      const res = await updatePage(pageId, pageData);
+      if (res.success) {
+        setPages(prev => prev.map(page => 
+          page._id === pageId ? { ...page, ...res.page } : page
+        ));
+        setSharedPages(prev => prev.map(page => 
+          page._id === pageId ? { ...page, ...res.page } : page
+        ));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to update page:', error);
+      return false;
     }
-    return false;
   };
 
   // Move page to trash
   const moveToTrash = async (pageId) => {
     if (!user?.token) return false;
     
-    const res = await deletePage(pageId, user.token);
-    if (res.success) {
-      setPages(prev => prev.filter(page => page._id !== pageId));
-      setSharedPages(prev => prev.filter(page => page._id !== pageId));
-      await fetchTrashPages();
-      return true;
+    try {
+      const res = await deletePage(pageId);
+      if (res.success) {
+        setPages(prev => prev.filter(page => page._id !== pageId));
+        setSharedPages(prev => prev.filter(page => page._id !== pageId));
+        await fetchTrashPages();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to delete page:', error);
+      return false;
     }
-    return false;
   };
 
   // Restore page from trash
   const restoreFromTrash = async (pageId) => {
     if (!user?.token) return false;
     
-    const res = await restorePage(pageId, user.token);
-    if (res.success) {
-      setTrashPages(prev => prev.filter(page => page._id !== pageId));
-      await fetchPages();
-      return true;
+    try {
+      const res = await restorePage(pageId);
+      if (res.success) {
+        setTrashPages(prev => prev.filter(page => page._id !== pageId));
+        await fetchPages();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to restore page:', error);
+      return false;
     }
-    return false;
   };
 
   // Permanently delete page
   const permanentDelete = async (pageId) => {
     if (!user?.token) return false;
     
-    const res = await permanentDeletePage(pageId, user.token);
-    if (res.success) {
-      setTrashPages(prev => prev.filter(page => page._id !== pageId));
-      return true;
+    try {
+      const res = await permanentDeletePage(pageId);
+      if (res.success) {
+        setTrashPages(prev => prev.filter(page => page._id !== pageId));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to permanently delete page:', error);
+      return false;
     }
-    return false;
   };
 
   // Duplicate page
   const duplicatePageContext = async (pageId) => {
     if (!user?.token) return false;
     
-    const res = await duplicatePage(pageId, user.token);
-    if (res.success) {
-      const duplicatedPage = {
-        ...res.page,
-        isOwner: true,
-        userRole: 'owner'
-      };
-      setPages(prev => [duplicatedPage, ...prev]);
-      return true;
+    try {
+      const res = await duplicatePage(pageId);
+      if (res.success) {
+        const duplicatedPage = {
+          ...res.page,
+          isOwner: true,
+          userRole: 'owner'
+        };
+        setPages(prev => [duplicatedPage, ...prev]);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to duplicate page:', error);
+      return false;
     }
-    return false;
   };
 
   // Toggle favorite
   const toggleFavoriteContext = async (pageId) => {
     if (!user?.token) return false;
     
-    const res = await toggleFavorite(pageId, user.token);
-    if (res.success) {
-      setPages(prev => prev.map(page => 
-        page._id === pageId ? { ...page, isFavorite: res.page.isFavorite } : page
-      ));
-      setSharedPages(prev => prev.map(page => 
-        page._id === pageId ? { ...page, isFavorite: res.page.isFavorite } : page
-      ));
-      return true;
+    try {
+      const res = await toggleFavorite(pageId);
+      if (res.success) {
+        setPages(prev => prev.map(page => 
+          page._id === pageId ? { ...page, isFavorite: res.page.isFavorite } : page
+        ));
+        setSharedPages(prev => prev.map(page => 
+          page._id === pageId ? { ...page, isFavorite: res.page.isFavorite } : page
+        ));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+      return false;
     }
-    return false;
   };
 
   // Load data when user changes

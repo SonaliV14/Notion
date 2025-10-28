@@ -89,6 +89,7 @@ export const getUserPages = async () => {
     const { data } = await protectedApi.get("/pages");
     return data;
   } catch (err) {
+    console.error('Get user pages error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to fetch pages",
@@ -101,6 +102,7 @@ export const getSharedPages = async () => {
     const { data } = await protectedApi.get("/pages/shared");
     return data;
   } catch (err) {
+    console.error('Get shared pages error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to fetch shared pages",
@@ -113,6 +115,7 @@ export const getFavoritePages = async () => {
     const { data } = await protectedApi.get("/pages/favorites");
     return data;
   } catch (err) {
+    console.error('Get favorite pages error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to fetch favorite pages",
@@ -125,6 +128,7 @@ export const getTrashPages = async () => {
     const { data } = await protectedApi.get("/pages/trash");
     return data;
   } catch (err) {
+    console.error('Get trash pages error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to fetch trash pages",
@@ -137,6 +141,7 @@ export const searchPages = async (query) => {
     const { data } = await protectedApi.get(`/pages/search?query=${encodeURIComponent(query)}`);
     return data;
   } catch (err) {
+    console.error('Search pages error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Search failed",
@@ -149,6 +154,7 @@ export const createPage = async (pageData) => {
     const { data } = await protectedApi.post("/pages", pageData);
     return data;
   } catch (err) {
+    console.error('Create page error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to create page",
@@ -161,6 +167,7 @@ export const getPage = async (pageId) => {
     const { data } = await protectedApi.get(`/pages/${pageId}`);
     return data;
   } catch (err) {
+    console.error('Get page error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to fetch page",
@@ -173,6 +180,7 @@ export const updatePage = async (pageId, pageData) => {
     const { data } = await protectedApi.put(`/pages/${pageId}`, pageData);
     return data;
   } catch (err) {
+    console.error('Update page error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to update page",
@@ -185,6 +193,7 @@ export const toggleFavorite = async (pageId) => {
     const { data } = await protectedApi.patch(`/pages/${pageId}/favorite`, {});
     return data;
   } catch (err) {
+    console.error('Toggle favorite error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to toggle favorite",
@@ -197,6 +206,7 @@ export const duplicatePage = async (pageId) => {
     const { data } = await protectedApi.post(`/pages/${pageId}/duplicate`, {});
     return data;
   } catch (err) {
+    console.error('Duplicate page error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to duplicate page",
@@ -212,6 +222,7 @@ export const sharePage = async (pageId, emails, permission) => {
     );
     return data;
   } catch (err) {
+    console.error('Share page error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to share page",
@@ -224,6 +235,7 @@ export const removeSharedUser = async (pageId, userId) => {
     const { data } = await protectedApi.delete(`/pages/${pageId}/share/${userId}`);
     return data;
   } catch (err) {
+    console.error('Remove shared user error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to remove user",
@@ -236,6 +248,7 @@ export const generateShareLink = async (pageId) => {
     const { data } = await protectedApi.post(`/pages/${pageId}/share-link`, {});
     return data;
   } catch (err) {
+    console.error('Generate share link error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to generate share link",
@@ -248,6 +261,7 @@ export const disableShareLink = async (pageId) => {
     const { data } = await protectedApi.delete(`/pages/${pageId}/share-link`);
     return data;
   } catch (err) {
+    console.error('Disable share link error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to disable share link",
@@ -260,6 +274,7 @@ export const deletePage = async (pageId) => {
     const { data } = await protectedApi.delete(`/pages/${pageId}`);
     return data;
   } catch (err) {
+    console.error('Delete page error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to delete page",
@@ -272,6 +287,7 @@ export const restorePage = async (pageId) => {
     const { data } = await protectedApi.patch(`/pages/${pageId}/restore`, {});
     return data;
   } catch (err) {
+    console.error('Restore page error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to restore page",
@@ -284,6 +300,7 @@ export const permanentDeletePage = async (pageId) => {
     const { data } = await protectedApi.delete(`/pages/${pageId}/permanent`);
     return data;
   } catch (err) {
+    console.error('Permanent delete error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to permanently delete page",
@@ -298,6 +315,7 @@ export const getPageBlocks = async (pageId) => {
     const { data } = await protectedApi.get(`/blocks/page/${pageId}`);
     return data;
   } catch (err) {
+    console.error('Get page blocks error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to fetch blocks",
@@ -310,6 +328,7 @@ export const createBlock = async (blockData) => {
     const { data } = await protectedApi.post("/blocks", blockData);
     return data;
   } catch (err) {
+    console.error('Create block error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to create block",
@@ -322,6 +341,7 @@ export const updateBlock = async (blockId, blockData) => {
     const { data } = await protectedApi.put(`/blocks/${blockId}`, blockData);
     return data;
   } catch (err) {
+    console.error('Update block error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to update block",
@@ -334,6 +354,7 @@ export const deleteBlock = async (blockId) => {
     const { data } = await protectedApi.delete(`/blocks/${blockId}`);
     return data;
   } catch (err) {
+    console.error('Delete block error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to delete block",
@@ -349,6 +370,7 @@ export const reorderBlocks = async (pageId, blockOrders) => {
     );
     return data;
   } catch (err) {
+    console.error('Reorder blocks error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to reorder blocks",
@@ -366,6 +388,7 @@ export const inviteCollaborator = async (pageId, email, role) => {
     );
     return data;
   } catch (err) {
+    console.error('Invite collaborator error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to invite collaborator",
@@ -378,6 +401,7 @@ export const getPageCollaborators = async (pageId) => {
     const { data } = await protectedApi.get(`/collaborators/pages/${pageId}/collaborators`);
     return data;
   } catch (err) {
+    console.error('Get page collaborators error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to fetch collaborators",
@@ -393,6 +417,7 @@ export const updateCollaboratorRole = async (collaboratorId, role) => {
     );
     return data;
   } catch (err) {
+    console.error('Update collaborator role error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to update role",
@@ -405,6 +430,7 @@ export const removeCollaborator = async (collaboratorId) => {
     const { data } = await protectedApi.delete(`/collaborators/collaborators/${collaboratorId}`);
     return data;
   } catch (err) {
+    console.error('Remove collaborator error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to remove collaborator",
@@ -419,6 +445,7 @@ export const acceptInvite = async (inviteToken) => {
     const { data } = await protectedApi.post(`/collaborators/invites/accept/${inviteToken}`, {});
     return data;
   } catch (err) {
+    console.error('Accept invite error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to accept invitation",
@@ -431,6 +458,7 @@ export const rejectInvite = async (inviteToken) => {
     const { data } = await protectedApi.post(`/collaborators/invites/reject/${inviteToken}`, {});
     return data;
   } catch (err) {
+    console.error('Reject invite error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to reject invitation",
@@ -444,6 +472,7 @@ export const getInviteDetails = async (inviteToken) => {
     const { data } = await protectedApi.get(`/collaborators/invites/details/${inviteToken}`);
     return data;
   } catch (err) {
+    console.error('Get invite details error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to fetch invite details",
@@ -457,6 +486,7 @@ export const getPendingInvites = async () => {
     const { data } = await protectedApi.get(`/collaborators/invites/pending`);
     return data;
   } catch (err) {
+    console.error('Get pending invites error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to fetch pending invites",
@@ -470,6 +500,7 @@ export const getCollaboratedPages = async () => {
     const { data } = await protectedApi.get(`/collaborators/collaborated-pages`);
     return data;
   } catch (err) {
+    console.error('Get collaborated pages error:', err);
     return {
       success: false,
       error: err.response?.data?.error || "Failed to fetch collaborated pages",

@@ -43,7 +43,9 @@ export default function Dashboard() {
   const [currentView, setCurrentView] = useState('home');
   const [expandedSections, setExpandedSections] = useState({
     private: true,
-    shared: false
+    shared: false,
+    favorites: false,
+    trash: false
   });
   const [editingPage, setEditingPage] = useState(null);
   const [favoritePages, setFavoritePages] = useState([]);
@@ -68,25 +70,41 @@ export default function Dashboard() {
 
   // Fetch favorite pages
   const fetchFavoritePagesList = async () => {
-    if (!user?.token) return;
-    const res = await getFavoritePages(user.token);
+    if (!user?.token) {
+      console.log('No user token, skipping fetchFavoritePagesList');
+      return;
+    }
+    console.log('Fetching favorite pages...');
+    const res = await getFavoritePages();
+    console.log('getFavoritePages response:', res);
     if (res.success) {
+      console.log('Setting favorite pages:', res.pages);
       setFavoritePages(res.pages);
+    } else {
+      console.error('Failed to fetch favorites:', res.error);
     }
   };
 
   // Fetch inbox (recently collaborated pages)
   const fetchInboxPagesList = async () => {
-    if (!user?.token) return;
+    if (!user?.token) {
+      console.log('No user token, skipping fetchInboxPagesList');
+      return;
+    }
+    console.log('Fetching inbox pages...');
     try {
-      const res = await getCollaboratedPages(user.token);
+      const res = await getCollaboratedPages();
+      console.log('getCollaboratedPages for inbox response:', res);
       if (res.success) {
         // Get only recently collaborated pages (last 7 days)
         const recentPages = res.pages.filter(page => {
           const daysSinceShared = (Date.now() - new Date(page.createdAt)) / (1000 * 60 * 60 * 24);
           return daysSinceShared <= 7;
         });
+        console.log('Setting inbox pages:', recentPages);
         setInboxPages(recentPages);
+      } else {
+        console.error('Failed to fetch inbox pages:', res.error);
       }
     } catch (error) {
       console.error('Failed to fetch inbox pages:', error);
@@ -174,7 +192,7 @@ export default function Dashboard() {
     if (pageToDelete && pageToDelete.owner?._id === user._id) {
       const success = await moveToTrash(pageId);
       if (success) {
-        navigate('/');
+        navigate('/dashboard');
         setCurrentView('home');
         setEditingPage(null);
       }
@@ -208,6 +226,10 @@ export default function Dashboard() {
 
   const handleToggleFavorite = async (pageId) => {
     await toggleFavoriteContext(pageId);
+    // Refresh favorites list if we're on the favorites view
+    if (currentView === 'favorites') {
+      await fetchFavoritePagesList();
+    }
   };
 
   const handlePageUpdate = (updatedPage) => {
@@ -230,7 +252,14 @@ export default function Dashboard() {
         setCurrentView('editor');
       } else {
         // Page not found, redirect to home
-        navigate('/');
+        navigate('/dashboard');
+        setCurrentView('home');
+      }
+    } else {
+      // No pageId, stay on current view (don't reset to home)
+      if (currentView === 'editor') {
+        setCurrentView('home');
+        setEditingPage(null);
       }
     }
   }, [pageId, pages, sharedPages, user, navigate]);
@@ -251,6 +280,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (user?.token) {
       loadCollaboratedPages();
+      fetchFavoritePagesList();
     }
   }, [user]);
 
@@ -292,7 +322,7 @@ export default function Dashboard() {
             </button>
             <button 
               onClick={() => {
-                navigate('/');
+                navigate('/dashboard');
                 setCurrentView('home');
                 setEditingPage(null);
               }}
@@ -303,9 +333,10 @@ export default function Dashboard() {
             </button>
             <button 
               onClick={() => {
-                navigate('/');
+                navigate('/dashboard');
                 setCurrentView('inbox');
                 setEditingPage(null);
+                fetchInboxPagesList();
               }}
               className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded ${currentView === 'inbox' ? 'bg-neutral-700' : ''}`}
             >
@@ -331,7 +362,7 @@ export default function Dashboard() {
             </button>
             <button 
               onClick={() => {
-                navigate('/');
+                navigate('/dashboard');
                 setCurrentView('my-pages');
                 setEditingPage(null);
               }}
@@ -342,20 +373,27 @@ export default function Dashboard() {
             </button>
             <button 
               onClick={() => {
-                navigate('/');
+                navigate('/dashboard');
                 setCurrentView('favorites');
                 setEditingPage(null);
+                fetchFavoritePagesList();
               }}
               className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded ${currentView === 'favorites' ? 'bg-neutral-700' : ''}`}
             >
               <Star className="w-4 h-4" />
               <span>Favorites</span>
+              {favoritePages.length > 0 && (
+                <span className="ml-auto text-xs bg-yellow-600 px-1 py-0.5 rounded-full text-xs">
+                  {favoritePages.length}
+                </span>
+              )}
             </button>
             <button 
               onClick={() => {
-                navigate('/');
+                navigate('/dashboard');
                 setCurrentView('shared');
                 setEditingPage(null);
+                loadCollaboratedPages();
               }}
               className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded ${currentView === 'shared' ? 'bg-neutral-700' : ''}`}
             >
@@ -369,19 +407,26 @@ export default function Dashboard() {
             </button>
             <button 
               onClick={() => {
-                navigate('/');
+                navigate('/dashboard');
                 setCurrentView('trash');
                 setEditingPage(null);
+                fetchTrashPages();
               }}
               className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded ${currentView === 'trash' ? 'bg-neutral-700' : ''}`}
             >
               <Trash2 className="w-4 h-4" />
               <span>Trash</span>
+              {trashPages.length > 0 && (
+                <span className="ml-auto text-xs bg-red-600 px-1 py-0.5 rounded-full text-xs">
+                  {trashPages.length}
+                </span>
+              )}
             </button>
           </div>
 
           <div className="my-3 border-t border-neutral-700" />
 
+          {/* Private Pages Section */}
           <div className="mb-4">
             <button 
               onClick={() => toggleSection('private')}
@@ -413,6 +458,46 @@ export default function Dashboard() {
             )}
           </div>
 
+          {/* Favorites Section */}
+          <div className="mb-4">
+            <button 
+              onClick={() => {
+                toggleSection('favorites');
+                if (!expandedSections.favorites) {
+                  fetchFavoritePagesList();
+                }
+              }}
+              className="w-full flex items-center gap-1 px-2 py-1 text-xs font-semibold text-gray-400 hover:bg-neutral-700 rounded"
+            >
+              {expandedSections.favorites ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              <span>Favorites</span>
+              {favoritePages.length > 0 && (
+                <span className="ml-auto text-xs bg-yellow-600 px-1.5 py-0.5 rounded-full">
+                  {favoritePages.length}
+                </span>
+              )}
+            </button>
+            {expandedSections.favorites && (
+              <div className="mt-1 space-y-0.5">
+                {favoritePages.length === 0 ? (
+                  <div className="px-2 py-1.5 text-sm text-gray-500">No favorites yet</div>
+                ) : (
+                  favoritePages.slice(0, 5).map(page => (
+                    <button 
+                      key={page._id} 
+                      onClick={() => handleOpenPage(page)}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded group"
+                    >
+                      <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                      <span className="flex-1 text-left truncate">{page.title}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Shared with me Section */}
           <div className="mb-4">
             <button 
               onClick={() => {
@@ -451,6 +536,49 @@ export default function Dashboard() {
                       }`}>
                         {page.userRole}
                       </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Trash Section */}
+          <div className="mb-4">
+            <button 
+              onClick={() => {
+                toggleSection('trash');
+                if (!expandedSections.trash) {
+                  fetchTrashPages();
+                }
+              }}
+              className="w-full flex items-center gap-1 px-2 py-1 text-xs font-semibold text-gray-400 hover:bg-neutral-700 rounded"
+            >
+              {expandedSections.trash ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              <span>Trash</span>
+              {trashPages.length > 0 && (
+                <span className="ml-auto text-xs bg-red-600 px-1.5 py-0.5 rounded-full">
+                  {trashPages.length}
+                </span>
+              )}
+            </button>
+            {expandedSections.trash && (
+              <div className="mt-1 space-y-0.5">
+                {trashPages.length === 0 ? (
+                  <div className="px-2 py-1.5 text-sm text-gray-500">No trash pages</div>
+                ) : (
+                  trashPages.slice(0, 5).map(page => (
+                    <button 
+                      key={page._id} 
+                      onClick={() => {
+                        navigate('/dashboard');
+                        setCurrentView('trash');
+                        setEditingPage(null);
+                      }}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-300 hover:bg-neutral-700 rounded group"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="flex-1 text-left truncate">{page.title}</span>
                     </button>
                   ))
                 )}
@@ -787,6 +915,48 @@ export default function Dashboard() {
                         className="p-2 hover:bg-neutral-700 rounded text-yellow-500 hover:text-gray-400 transition-colors"
                       >
                         <Star className="w-4 h-4 fill-current" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* INBOX VIEW */}
+        {currentView === 'inbox' && (
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-6xl mx-auto px-20 py-16">
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold mb-2">Inbox</h1>
+                <p className="text-gray-400">Recently shared pages and updates</p>
+              </div>
+
+              {inboxPages.length === 0 ? (
+                <div className="text-center py-12">
+                  <Inbox className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-400 mb-2">Your inbox is empty</h3>
+                  <p className="text-gray-500">Recent collaboration updates will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {inboxPages.map((page) => (
+                    <div 
+                      key={page._id}
+                      className="flex items-center justify-between p-4 bg-neutral-800 hover:bg-neutral-750 rounded-lg border border-neutral-700 transition-colors"
+                    >
+                      <button 
+                        onClick={() => handleOpenPage(page)}
+                        className="flex items-center gap-3 flex-1 text-left"
+                      >
+                        <Inbox className="w-5 h-5 text-gray-400" />
+                        <div>
+                          <h3 className="font-medium">{page.title}</h3>
+                          <p className="text-sm text-gray-500">
+                            Shared by {page.owner?.firstname} {page.owner?.lastname}
+                          </p>
+                        </div>
                       </button>
                     </div>
                   ))}
